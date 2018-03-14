@@ -12,9 +12,6 @@ func Start(config *Config, up chan *Timeline) error {
 		return err
 	}
 
-	// start Timeline aux routines
-	// TODO add go x.auxRoutine() or delete comment
-
 	registerServer := func(s *grpc.Server) { api.RegisterTimelineServer(s, c) }
 	return c.Serve(registerServer, func() { up <- c })
 }
