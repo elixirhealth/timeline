@@ -64,17 +64,10 @@
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/key"
-  packages = ["pkg/keyapi"]
-  revision = "98a7151d7d41fbe8210cf992da76b64fd8ed37dc"
-
-[[projects]]
-  branch = "develop"
   name = "github.com/elxirhealth/service-base"
   packages = [
     "pkg/cmd",
     "pkg/server",
-    "pkg/util",
     "pkg/version"
   ]
   revision = "6659a9524052cf3893625d6d01386709cb2d141d"
@@ -300,13 +293,13 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "892bf7b0c6e2f93b51166bf3882e50277fa5afc6"
+  revision = "e0c57d8f86c17f0724497efcb3bc617e82834821"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "8c0ece68c28377f4c326d85b94f8df0dace46f80"
+  revision = "89ac7f292d17a339edab4de8efcba5d8672ff661"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -378,6 +371,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "017e35b46c554b0625ae7f9681c26ce08d071831ab86201e806a20cf4a7dd2fd"
+  inputs-digest = "8f1b3930875ca426cb33a3d9196c51359ceaa48745a15a28e27217fe9da1b184"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -25,5 +25,3 @@ func TestNewTimeline_err(t *testing.T) {
 		assert.Nil(t, c)
 	}
 }
-
-// TODO add TestTimeline_ENDPOINT_(ok|err) for each ENDPOINT

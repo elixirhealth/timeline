@@ -38,6 +38,11 @@
     name = "github.com/drausin/libri"
     non-go = false
 
+  [[prune.project]]
+    name = "github.com/ethereum/go-ethereum"
+    non-go = false
+    unused-packages = false
+
 [[constraint]]
   branch = "develop"
   name = "github.com/drausin/libri"
