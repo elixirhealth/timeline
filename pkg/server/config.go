@@ -9,7 +9,7 @@ import (
 )
 
 const (
-// TODO add default config values here
+	DefaultParallelism = uint(4)
 )
 
 // Config is the config for a Timeline instance.
@@ -17,6 +17,7 @@ type Config struct {
 	*server.BaseConfig
 
 	RequestTimeout time.Duration
+	Parallelism    uint
 }
 
 // NewDefaultConfig create a new config instance with default values.

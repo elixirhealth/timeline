@@ -15,6 +15,7 @@ import (
 	"github.com/elxirhealth/user/pkg/userapi"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -24,9 +25,12 @@ var (
 )
 
 func TestEntityIDGetter(t *testing.T) {
+	lg := zap.NewNop() // logging.NewDevLogger(zapcore.DebugLevel)
+
 	// ok
 	entityIDs1 := []string{"entity ID 1", "entity ID 2"}
 	g := &entityIDGetterImpl{
+		lg: lg,
 		user: &fixedUser{
 			getRp: &userapi.GetEntitiesResponse{
 				EntityIds: entityIDs1,
@@ -39,6 +43,7 @@ func TestEntityIDGetter(t *testing.T) {
 
 	// rq error
 	g = &entityIDGetterImpl{
+		lg:   lg,
 		user: &fixedUser{getErr: errTest},
 	}
 	entityIDs2, err = g.get("some user ID")
@@ -47,6 +52,7 @@ func TestEntityIDGetter(t *testing.T) {
 }
 
 func TestPubReceiptGetter(t *testing.T) {
+	lg := zap.NewNop() // logging.NewDevLogger(zapcore.DebugLevel)
 	now := time.Now().Unix() * 1E6
 	envKey1 := append(make([]byte, id.Length-1), 1)
 	envKey2 := append(make([]byte, id.Length-1), 2)
@@ -103,54 +109,64 @@ func TestPubReceiptGetter(t *testing.T) {
 		},
 	}
 
-	c := &fixedCatalog{prs: make(map[string][]*catapi.PublicationReceipt)}
-	for _, pr := range prs {
-		c.prs[pr.ReaderEntityId] = append(c.prs[pr.ReaderEntityId], pr)
-	}
+	for parallelism := uint(1); parallelism < DefaultParallelism*2; parallelism++ {
 
-	// ok
-	g := &pubReceiptGetterImpl{
-		catalog: c,
-	}
-	tr := &api.TimeRange{UpperBound: now}
-	limit := 2
-	gotPRs, err := g.get([]string{readerEntityID1, readerEntityID2}, tr, 2)
-	assert.Nil(t, err)
-	assert.Equal(t, limit, len(gotPRs))
-	assert.True(t, gotPRs[0].ReceivedTime > gotPRs[1].ReceivedTime)
+		c := &fixedCatalog{prs: make(map[string][]*catapi.PublicationReceipt)}
+		for _, pr := range prs {
+			c.prs[pr.ReaderEntityId] = append(c.prs[pr.ReaderEntityId], pr)
+		}
 
-	// catalog search err
-	g = &pubReceiptGetterImpl{
-		catalog: &fixedCatalog{searchErr: errTest},
-	}
-	gotPRs, err = g.get([]string{readerEntityID1, readerEntityID2}, tr, 2)
-	assert.Equal(t, errTest, err)
-	assert.Nil(t, gotPRs)
+		// ok
+		g := &pubReceiptGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			catalog:     c,
+		}
+		tr := &api.TimeRange{UpperBound: now}
+		limit := uint32(2)
+		gotPRs, err := g.get([]string{readerEntityID1, readerEntityID2}, tr, limit)
+		assert.Nil(t, err)
+		assert.Equal(t, int(limit), len(gotPRs))
+		assert.True(t, gotPRs[0].ReceivedTime > gotPRs[1].ReceivedTime)
 
-	// missing author ID err
-	g = &pubReceiptGetterImpl{
-		catalog: &fixedCatalog{
-			prs: map[string][]*catapi.PublicationReceipt{
-				readerEntityID1: {
-					{
-						EnvelopeKey:     envKey1,
-						EntryKey:        entryKey1,
-						AuthorPublicKey: authorPub1,
-						AuthorEntityId:  "", // missing
-						ReaderPublicKey: readerPub1,
-						ReaderEntityId:  readerEntityID1,
-						ReceivedTime:    now - 5,
+		// catalog search err
+		g = &pubReceiptGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			catalog:     &fixedCatalog{searchErr: errTest},
+		}
+		gotPRs, err = g.get([]string{readerEntityID1, readerEntityID2}, tr, limit)
+		assert.Equal(t, errTest, err)
+		assert.Nil(t, gotPRs)
+
+		// missing author ID err
+		g = &pubReceiptGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			catalog: &fixedCatalog{
+				prs: map[string][]*catapi.PublicationReceipt{
+					readerEntityID1: {
+						{
+							EnvelopeKey:     envKey1,
+							EntryKey:        entryKey1,
+							AuthorPublicKey: authorPub1,
+							AuthorEntityId:  "", // missing
+							ReaderPublicKey: readerPub1,
+							ReaderEntityId:  readerEntityID1,
+							ReceivedTime:    now - 5,
+						},
 					},
 				},
 			},
-		},
+		}
+		gotPRs, err = g.get([]string{readerEntityID1, readerEntityID2}, tr, limit)
+		assert.Equal(t, ErrMissingAuthorEntityID, err)
+		assert.Nil(t, gotPRs)
 	}
-	gotPRs, err = g.get([]string{readerEntityID1, readerEntityID2}, tr, 2)
-	assert.Equal(t, ErrMissingAuthorEntityID, err)
-	assert.Nil(t, gotPRs)
 }
 
 func TestEnvelopeGetter(t *testing.T) {
+	lg := zap.NewNop() // logging.NewDevLogger(zapcore.DebugLevel)
 	rng := rand.New(rand.NewSource(0))
 	env1 := libriapi.NewTestEnvelope(rng)
 	envDoc1 := &libriapi.Document{
@@ -169,113 +185,135 @@ func TestEnvelopeGetter(t *testing.T) {
 	envKey2, err := libriapi.GetKey(envDoc2)
 	assert.Nil(t, err)
 
-	prs := []*catapi.PublicationReceipt{
-		// other fields would normally be populated but aren't needed for test
-		{EnvelopeKey: envKey1.Bytes()},
-		{EnvelopeKey: envKey2.Bytes()},
-	}
+	for parallelism := uint(1); parallelism < DefaultParallelism*2; parallelism++ {
 
-	// ok
-	c := &fixedCourier{
-		docs: map[string]*libriapi.Document{
-			envKey1.String(): envDoc1,
-			envKey2.String(): envDoc2,
-		},
-	}
-	g := &envelopeGetterImpl{
-		courier: c,
-	}
-	envs, err := g.get(prs)
-	assert.Nil(t, err)
-	assert.Equal(t, []*libriapi.Envelope{env1, env2}, envs)
+		prs := []*catapi.PublicationReceipt{
+			// other fields would normally be populated but aren't needed for test
+			{EnvelopeKey: envKey1.Bytes()},
+			{EnvelopeKey: envKey2.Bytes()},
+		}
 
-	// courier get err
-	g = &envelopeGetterImpl{
-		courier: &fixedCourier{getErr: errTest},
-	}
-	envs, err = g.get(prs)
-	assert.Equal(t, errTest, err)
-	assert.Nil(t, envs)
+		// ok
+		c := &fixedCourier{
+			docs: map[string]*libriapi.Document{
+				envKey1.String(): envDoc1,
+				envKey2.String(): envDoc2,
+			},
+		}
+		g := &envelopeGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			courier:     c,
+		}
+		envs, err := g.get(prs)
+		assert.Nil(t, err)
+		assert.Equal(t, []*libriapi.Envelope{env1, env2}, envs)
 
-	// doc not envelope err
-	entryDoc, entryDocKey := libriapi.NewTestDocument(rng)
-	c = &fixedCourier{
-		docs: map[string]*libriapi.Document{
-			entryDocKey.String(): entryDoc,
-		},
+		// courier get err
+		g = &envelopeGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			courier:     &fixedCourier{getErr: errTest},
+		}
+		envs, err = g.get(prs)
+		assert.Equal(t, errTest, err)
+		assert.Nil(t, envs)
+
+		// doc not envelope err
+		entryDoc, entryDocKey := libriapi.NewTestDocument(rng)
+		c = &fixedCourier{
+			docs: map[string]*libriapi.Document{
+				entryDocKey.String(): entryDoc,
+			},
+		}
+		g = &envelopeGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			courier:     c,
+		}
+		prs = []*catapi.PublicationReceipt{
+			// other fields would normally be populated but aren't needed for test
+			{EnvelopeKey: entryDocKey.Bytes()},
+		}
+		envs, err = g.get(prs)
+		assert.Equal(t, ErrDocNotEnvelope, err)
+		assert.Nil(t, envs)
 	}
-	g = &envelopeGetterImpl{
-		courier: c,
-	}
-	prs = []*catapi.PublicationReceipt{
-		// other fields would normally be populated but aren't needed for test
-		{EnvelopeKey: entryDocKey.Bytes()},
-	}
-	envs, err = g.get(prs)
-	assert.Equal(t, ErrDocNotEnvelope, err)
-	assert.Nil(t, envs)
 }
 
 func TestEntryMetadataGetter(t *testing.T) {
+	lg := zap.NewNop() // logging.NewDevLogger(zapcore.DebugLevel)
 	rng := rand.New(rand.NewSource(0))
 	entryDoc1, entryDocKey1 := libriapi.NewTestDocument(rng)
 	entryDoc2, entryDocKey2 := libriapi.NewTestDocument(rng)
 
-	// ok
-	c := &fixedCourier{
-		docs: map[string]*libriapi.Document{
-			entryDocKey1.String(): entryDoc1,
-			entryDocKey2.String(): entryDoc2,
-		},
-	}
-	g := &entryMetadataGetterImpl{
-		courier: c,
-	}
-	prs := []*catapi.PublicationReceipt{
-		// other fields would normally be populated but aren't needed for test
-		{EntryKey: entryDocKey1.Bytes()},
-		{EntryKey: entryDocKey2.Bytes()},
-		{EntryKey: entryDocKey1.Bytes()}, // repeat, to test dedup
-	}
-	em, err := g.get(prs)
-	assert.Nil(t, err)
-	assert.Equal(t, 2, len(em))
-	assert.Contains(t, em, entryDocKey1.String())
-	assert.Contains(t, em, entryDocKey2.String())
+	for parallelism := uint(1); parallelism < DefaultParallelism*2; parallelism++ {
 
-	// courier get err
-	g = &entryMetadataGetterImpl{
-		courier: &fixedCourier{getErr: errTest},
-	}
-	em, err = g.get(prs)
-	assert.Equal(t, errTest, err)
-	assert.Nil(t, em)
+		// ok
+		c := &fixedCourier{
+			docs: map[string]*libriapi.Document{
+				entryDocKey1.String(): entryDoc1,
+				entryDocKey2.String(): entryDoc2,
+			},
+		}
+		g := &entryMetadataGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			courier:     c,
+		}
+		prs := []*catapi.PublicationReceipt{
+			// other fields would normally be populated but aren't needed for test
+			{EntryKey: entryDocKey1.Bytes()},
+			{EntryKey: entryDocKey2.Bytes()},
+			{EntryKey: entryDocKey1.Bytes()}, // repeat, to test dedup
+		}
+		em, err := g.get(prs)
+		assert.Nil(t, err)
+		assert.Equal(t, 2, len(em))
+		assert.Contains(t, em, entryDocKey1.String())
+		assert.Contains(t, em, entryDocKey2.String())
 
-	// doc not entry err
-	envDoc := &libriapi.Document{
-		Contents: &libriapi.Document_Envelope{
-			Envelope: libriapi.NewTestEnvelope(rng),
-		},
+		// courier get err
+		g = &entryMetadataGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			courier:     &fixedCourier{getErr: errTest},
+		}
+		em, err = g.get(prs)
+		assert.Equal(t, errTest, err)
+		assert.Nil(t, em)
+
+		// doc not entry err
+		envDoc := &libriapi.Document{
+			Contents: &libriapi.Document_Envelope{
+				Envelope: libriapi.NewTestEnvelope(rng),
+			},
+		}
+		envDocKey, err := libriapi.GetKey(envDoc)
+		c = &fixedCourier{
+			docs: map[string]*libriapi.Document{
+				envDocKey.String(): envDoc,
+			},
+		}
+		g = &entryMetadataGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			courier:     c,
+		}
+		prs = []*catapi.PublicationReceipt{
+			// other fields would normally be populated but aren't needed for test
+			{EntryKey: envDocKey.Bytes()},
+		}
+		em, err = g.get(prs)
+		assert.Equal(t, ErrDocNotEntry, err)
+		assert.Nil(t, em)
+
 	}
-	envDocKey, err := libriapi.GetKey(envDoc)
-	c = &fixedCourier{
-		docs: map[string]*libriapi.Document{
-			envDocKey.String(): envDoc,
-		},
-	}
-	g = &entryMetadataGetterImpl{
-		courier: c,
-	}
-	prs = []*catapi.PublicationReceipt{
-		// other fields would normally be populated but aren't needed for test
-		{EntryKey: envDocKey.Bytes()},
-	}
-	em, err = g.get(prs)
-	assert.Equal(t, ErrDocNotEntry, err)
-	assert.Nil(t, em)
 }
 
 func TestEntitySummaryGetter(t *testing.T) {
+	lg := zap.NewNop() // logging.NewDevLogger(zapcore.DebugLevel)
+
 	entity1 := &dirapi.Entity{
 		EntityId: "entity ID 1",
 		TypeAttributes: &dirapi.Entity_Patient{
@@ -301,48 +339,56 @@ func TestEntitySummaryGetter(t *testing.T) {
 		},
 	}
 
-	// ok
-	d := &fixedDirectory{
-		entities: map[string]*dirapi.Entity{
-			entity1.EntityId: entity1,
-			entity2.EntityId: entity2,
-			entity3.EntityId: entity3,
-		},
-	}
-	g := &entitySummaryGetterImpl{
-		directory: d,
-	}
-	prs := []*catapi.PublicationReceipt{
-		{
-			ReaderEntityId: entity1.EntityId,
-			AuthorEntityId: entity2.EntityId,
-		},
-		{
-			ReaderEntityId: entity1.EntityId,
-			AuthorEntityId: entity3.EntityId,
-		},
-		{
-			ReaderEntityId: entity2.EntityId,
-			AuthorEntityId: entity3.EntityId,
-		},
-	}
-	es, err := g.get(prs)
-	assert.Nil(t, err)
-	assert.Equal(t, 3, len(es))
-	for entityID := range d.entities {
-		assert.Equal(t, entityID, es[entityID].EntityId)
-		assert.NotEmpty(t, es[entityID].Type)
-	}
+	for parallelism := uint(1); parallelism < DefaultParallelism*2; parallelism++ {
 
-	// directory get entity err
-	g = &entitySummaryGetterImpl{
-		directory: &fixedDirectory{
-			getEntityErr: errTest,
-		},
+		// ok
+		d := &fixedDirectory{
+			entities: map[string]*dirapi.Entity{
+				entity1.EntityId: entity1,
+				entity2.EntityId: entity2,
+				entity3.EntityId: entity3,
+			},
+		}
+		g := &entitySummaryGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			directory:   d,
+		}
+		prs := []*catapi.PublicationReceipt{
+			{
+				ReaderEntityId: entity1.EntityId,
+				AuthorEntityId: entity2.EntityId,
+			},
+			{
+				ReaderEntityId: entity1.EntityId,
+				AuthorEntityId: entity3.EntityId,
+			},
+			{
+				ReaderEntityId: entity2.EntityId,
+				AuthorEntityId: entity3.EntityId,
+			},
+		}
+		es, err := g.get(prs)
+		assert.Nil(t, err)
+		assert.Equal(t, 3, len(es))
+		for entityID := range d.entities {
+			assert.Equal(t, entityID, es[entityID].EntityId)
+			assert.NotEmpty(t, es[entityID].Type)
+		}
+
+		// directory get entity err
+		g = &entitySummaryGetterImpl{
+			lg:          lg,
+			parallelism: parallelism,
+			directory: &fixedDirectory{
+				getEntityErr: errTest,
+			},
+		}
+		es, err = g.get(prs)
+		assert.Equal(t, errTest, err)
+		assert.Nil(t, es)
+
 	}
-	es, err = g.get(prs)
-	assert.Equal(t, errTest, err)
-	assert.Nil(t, es)
 }
 
 type fixedUser struct {
