@@ -21,7 +21,7 @@ type Timeline struct {
 	config *Config
 
 	entityIDGetter      entityIDGetter
-	pubReceitGetter     pubReceiptGetter
+	pubReceiptGetter    pubReceiptGetter
 	envelopeGetter      envelopeGetter
 	entryMetadataGetter entryMetadataGetter
 	entitySummaryGetter entitySummaryGetter
@@ -39,7 +39,7 @@ func newTimeline(config *Config) (*Timeline, error) {
 func (t *Timeline) Get(
 	ctx context.Context, rq *api.GetRequest,
 ) (*api.GetResponse, error) {
-	if err := api.ValidateGetRequest(rq); err == nil {
+	if err := api.ValidateGetRequest(rq); err != nil {
 		return nil, err
 	}
 	limit := rq.Limit
@@ -51,7 +51,7 @@ func (t *Timeline) Get(
 	if err != nil {
 		return nil, err
 	}
-	prs, err := t.pubReceitGetter.get(readerEntityIDs, rq.TimeRange, limit)
+	prs, err := t.pubReceiptGetter.get(readerEntityIDs, rq.TimeRange, limit)
 	if err != nil {
 		return nil, err
 	}
