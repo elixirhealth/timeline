@@ -13,7 +13,7 @@ func TestStart(t *testing.T) {
 	wg1.Add(1)
 	go func(wg2 *sync.WaitGroup) {
 		defer wg2.Done()
-		err := Start(NewDefaultConfig(), up)
+		err := Start(okConfig, up)
 		assert.Nil(t, err)
 	}(wg1)
 

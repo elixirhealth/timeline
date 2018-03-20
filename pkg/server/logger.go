@@ -17,6 +17,11 @@ const (
 	logNEnvelopes    = "n_envelopes"
 	logEntryKeyShort = "entry_key_short"
 	logNEntries      = "n_entries"
+
+	logCourier   = "courier"
+	logCatalog   = "catalog"
+	logDirectory = "directory"
+	logUser      = "user"
 )
 
 func logEntityIDGet(userID string, entityIDs []string) []zapcore.Field {

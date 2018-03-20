@@ -47,20 +47,38 @@
 [[projects]]
   branch = "develop"
   name = "github.com/elxirhealth/catalog"
-  packages = ["pkg/catalogapi"]
+  packages = [
+    "pkg/catalogapi",
+    "pkg/client"
+  ]
   revision = "91a09b55f540b87ea1720bc483a9a4ca993f4d87"
 
 [[projects]]
   branch = "develop"
   name = "github.com/elxirhealth/courier"
-  packages = ["pkg/courierapi"]
-  revision = "8f9fa6dae3c4caa8a80c63ced2bb23854c06a143"
+  packages = [
+    "pkg/client",
+    "pkg/courierapi"
+  ]
+  revision = "01f2c3641b5e81147e08d1da22ddf7d4c58b86e6"
 
 [[projects]]
   branch = "develop"
   name = "github.com/elxirhealth/directory"
-  packages = ["pkg/directoryapi"]
-  revision = "f0e5c77ab11b4e4f4425463d16d2cf5b7015b110"
+  packages = [
+    "pkg/client",
+    "pkg/directoryapi"
+  ]
+  revision = "1f4e8329f7fc53714d8036cf79f9b6cdedbe7577"
+
+[[projects]]
+  branch = "develop"
+  name = "github.com/elxirhealth/key"
+  packages = [
+    "pkg/client",
+    "pkg/keyapi"
+  ]
+  revision = "935bc194cda0da986d5ca2d22be6cf38210de38b"
 
 [[projects]]
   branch = "develop"
@@ -68,15 +86,19 @@
   packages = [
     "pkg/cmd",
     "pkg/server",
+    "pkg/util",
     "pkg/version"
   ]
-  revision = "6659a9524052cf3893625d6d01386709cb2d141d"
+  revision = "4db3ff36815e2ea5caccc03f35bb6dfe5dea9fcb"
 
 [[projects]]
   branch = "develop"
   name = "github.com/elxirhealth/user"
-  packages = ["pkg/userapi"]
-  revision = "e122716849591abdd83490b6d68d44d33e16663f"
+  packages = [
+    "pkg/client",
+    "pkg/userapi"
+  ]
+  revision = "86f8851185770a941528e9ae40542725d6f97351"
 
 [[projects]]
   name = "github.com/ethereum/go-ethereum"
@@ -293,13 +315,13 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "e0c57d8f86c17f0724497efcb3bc617e82834821"
+  revision = "24dd3780ca4f75fed9f321890729414a4b5d3f13"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "89ac7f292d17a339edab4de8efcba5d8672ff661"
+  revision = "01acb38716e021ed1fc03a602bdb5838e1358c5e"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -326,7 +348,7 @@
   branch = "master"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
-  revision = "df60624c1e9b9d2973e889c7a1cff73155da81c4"
+  revision = "f8c8703595236ae70fdf8789ecb656ea0bcdcf46"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -371,6 +393,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8f1b3930875ca426cb33a3d9196c51359ceaa48745a15a28e27217fe9da1b184"
+  inputs-digest = "1c8d29b1087281f890ded00d4f412a6e12910d8cc513f8432fcaf6af5f131629"
   solver-name = "gps-cdcl"
   solver-version = 1

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"math/rand"
+	"net"
 	"testing"
 	"time"
 
@@ -15,18 +16,44 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	testDummyAddr = &net.TCPAddr{IP: net.ParseIP("localhost"), Port: 20100}
+	okConfig      = NewDefaultConfig().
+			WithCourierAddr(testDummyAddr).
+			WithCatalogAddr(testDummyAddr).
+			WithDirectoryAddr(testDummyAddr).
+			WithUserAddr(testDummyAddr)
+)
+
 func TestNewTimeline_ok(t *testing.T) {
-	config := NewDefaultConfig()
-	c, err := newTimeline(config)
+	c, err := newTimeline(okConfig)
 	assert.Nil(t, err)
-	assert.Equal(t, config, c.config)
-	// TODO assert.NotEmpty on other elements of server struct
-	//assert.NotEmpty(t, c.storer)
+	assert.Equal(t, okConfig, c.config)
+	assert.NotEmpty(t, c.entityIDGetter)
+	assert.NotEmpty(t, c.pubReceiptGetter)
+	assert.NotEmpty(t, c.envelopeGetter)
+	assert.NotEmpty(t, c.entryMetadataGetter)
+	assert.NotEmpty(t, c.entitySummaryGetter)
 }
 
 func TestNewTimeline_err(t *testing.T) {
 	badConfigs := map[string]*Config{
-	// TODO add bad config instances
+		"missing courier config": NewDefaultConfig().
+			WithCatalogAddr(testDummyAddr).
+			WithDirectoryAddr(testDummyAddr).
+			WithUserAddr(testDummyAddr),
+		"missing catalog config": NewDefaultConfig().
+			WithCourierAddr(testDummyAddr).
+			WithDirectoryAddr(testDummyAddr).
+			WithUserAddr(testDummyAddr),
+		"missing directory config": NewDefaultConfig().
+			WithCourierAddr(testDummyAddr).
+			WithCatalogAddr(testDummyAddr).
+			WithUserAddr(testDummyAddr),
+		"missing user config": NewDefaultConfig().
+			WithCourierAddr(testDummyAddr).
+			WithCatalogAddr(testDummyAddr).
+			WithDirectoryAddr(testDummyAddr),
 	}
 	for desc, badConfig := range badConfigs {
 		c, err := newTimeline(badConfig)

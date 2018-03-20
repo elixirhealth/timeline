@@ -58,56 +58,15 @@ func (g *pubReceiptGetterImpl) get(
 	mu := new(sync.Mutex)
 	entityIDCh := toLoadedStringChan(entityIDs)
 	errs := make(chan error, g.parallelism)
-	errored := safeFlag{}
+	errored := &safeFlag{}
 
 	prHeap := &publicationReceipts{}
-	wg1 := new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 	for i := uint(0); i < g.parallelism; i++ {
-		wg1.Add(1)
-		go func(wg2 *sync.WaitGroup) {
-			defer wg2.Done()
-			for rEntityID := range entityIDCh {
-				if errored.isTrue() {
-					return
-				}
-				rq := &catapi.SearchRequest{
-					ReaderEntityId: rEntityID,
-					AuthorEntityId: "",
-					After:          tr.LowerBound,
-					Before:         tr.UpperBound,
-					Limit:          limit,
-				}
-
-				ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
-				rp, err := g.catalog.Search(ctx, rq)
-				cancel()
-				if err != nil {
-					errs <- err
-					errored.setTrue()
-					return
-				}
-				for _, readerPR := range rp.Result {
-					if readerPR.AuthorEntityId == "" {
-						errs <- ErrMissingAuthorEntityID
-						errored.setTrue()
-						return
-					}
-					mu.Lock()
-					heap.Push(prHeap, readerPR)
-					if prHeap.Len() > int(limit) {
-						heap.Pop(prHeap)
-					}
-					mu.Unlock()
-				}
-				g.lg.Debug("got publications for entity",
-					logPubsGet(rEntityID, rp.Result)...)
-				if errored.isTrue() {
-					return
-				}
-			}
-		}(wg1)
+		wg.Add(1)
+		go g.getWorker(wg, entityIDCh, errs, errored, prHeap, mu, tr, limit)
 	}
-	wg1.Wait()
+	wg.Wait()
 
 	select {
 	case err := <-errs:
@@ -122,6 +81,58 @@ func (g *pubReceiptGetterImpl) get(
 	}
 	g.lg.Debug("got all publications for entities", logAllPubsGet(entityIDs, prs)...)
 	return prs, nil
+}
+
+func (g *pubReceiptGetterImpl) getWorker(
+	wg *sync.WaitGroup,
+	entityIDCh chan string,
+	errs chan error,
+	errored *safeFlag,
+	prHeap heap.Interface,
+	mu sync.Locker,
+	tr *api.TimeRange,
+	limit uint32,
+) {
+	defer wg.Done()
+	for rEntityID := range entityIDCh {
+		if errored.isTrue() {
+			return
+		}
+		rq := &catapi.SearchRequest{
+			ReaderEntityId: rEntityID,
+			AuthorEntityId: "",
+			After:          tr.LowerBound,
+			Before:         tr.UpperBound,
+			Limit:          limit,
+		}
+
+		ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
+		rp, err := g.catalog.Search(ctx, rq)
+		cancel()
+		if err != nil {
+			errs <- err
+			errored.setTrue()
+			return
+		}
+		for _, readerPR := range rp.Result {
+			if readerPR.AuthorEntityId == "" {
+				errs <- ErrMissingAuthorEntityID
+				errored.setTrue()
+				return
+			}
+			mu.Lock()
+			heap.Push(prHeap, readerPR)
+			if prHeap.Len() > int(limit) {
+				heap.Pop(prHeap)
+			}
+			mu.Unlock()
+		}
+		g.lg.Debug("got publications for entity",
+			logPubsGet(rEntityID, rp.Result)...)
+		if errored.isTrue() {
+			return
+		}
+	}
 }
 
 type envelopeGetter interface {
@@ -141,7 +152,7 @@ func (g *envelopeGetterImpl) get(prs []*catapi.PublicationReceipt) ([]*libriapi.
 	mu := new(sync.Mutex)
 	prsCh := toLoadedPRChan(prs)
 	errs := make(chan error, g.parallelism)
-	errored := safeFlag{}
+	errored := &safeFlag{}
 
 	envKeyIdxs := make(map[string]int)
 	for i, pr := range prs {
@@ -151,38 +162,7 @@ func (g *envelopeGetterImpl) get(prs []*catapi.PublicationReceipt) ([]*libriapi.
 	wg1 := new(sync.WaitGroup)
 	for c := uint(0); c < g.parallelism; c++ {
 		wg1.Add(1)
-		go func(wg2 *sync.WaitGroup) {
-			defer wg2.Done()
-			for pr := range prsCh {
-				if errored.isTrue() {
-					return
-				}
-				rq := &courierapi.GetRequest{Key: pr.EnvelopeKey}
-				ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
-				rp, err := g.courier.Get(ctx, rq)
-				cancel()
-				if err != nil {
-					errs <- err
-					errored.setTrue()
-					return
-				}
-				env, ok := rp.Value.Contents.(*libriapi.Document_Envelope)
-				if !ok {
-					errs <- ErrDocNotEnvelope
-					errored.setTrue()
-					return
-				}
-				i := envKeyIdxs[hex.EncodeToString(pr.EnvelopeKey)]
-				mu.Lock()
-				envs[i] = env.Envelope
-				mu.Unlock()
-				g.lg.Debug("got envelope",
-					zap.String(logEnvKeyShort, shortHex(pr.EnvelopeKey)))
-				if errored.isTrue() {
-					return
-				}
-			}
-		}(wg1)
+		go g.getWorker(wg1, prsCh, errs, errored, envKeyIdxs, mu, envs)
 	}
 	wg1.Wait()
 
@@ -192,6 +172,46 @@ func (g *envelopeGetterImpl) get(prs []*catapi.PublicationReceipt) ([]*libriapi.
 	default:
 		g.lg.Debug("got all envelopes", zap.Int(logNEnvelopes, len(envs)))
 		return envs, nil
+	}
+}
+func (g *envelopeGetterImpl) getWorker(
+	wg *sync.WaitGroup,
+	prsCh chan *catapi.PublicationReceipt,
+	errs chan error,
+	errored *safeFlag,
+	envKeyIdxs map[string]int,
+	mu sync.Locker,
+	envs []*libriapi.Envelope,
+) {
+	defer wg.Done()
+	for pr := range prsCh {
+		if errored.isTrue() {
+			return
+		}
+		rq := &courierapi.GetRequest{Key: pr.EnvelopeKey}
+		ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
+		rp, err := g.courier.Get(ctx, rq)
+		cancel()
+		if err != nil {
+			errs <- err
+			errored.setTrue()
+			return
+		}
+		env, ok := rp.Value.Contents.(*libriapi.Document_Envelope)
+		if !ok {
+			errs <- ErrDocNotEnvelope
+			errored.setTrue()
+			return
+		}
+		i := envKeyIdxs[hex.EncodeToString(pr.EnvelopeKey)]
+		mu.Lock()
+		envs[i] = env.Envelope
+		mu.Unlock()
+		g.lg.Debug("got envelope",
+			zap.String(logEnvKeyShort, shortHex(pr.EnvelopeKey)))
+		if errored.isTrue() {
+			return
+		}
 	}
 }
 
@@ -226,50 +246,15 @@ func (g *entryMetadataGetterImpl) get(
 
 	mu := new(sync.Mutex)
 	errs := make(chan error, g.parallelism)
-	errored := safeFlag{}
+	errored := &safeFlag{}
 	entryMetas := make(map[string]*api.EntryMetadata)
 
-	wg1 := new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 	for c := uint(0); c < g.parallelism; c++ {
-		wg1.Add(1)
-		go func(wg2 *sync.WaitGroup) {
-			defer wg2.Done()
-			for entryKeyHex := range entryKeyHexsCh {
-				if errored.isTrue() {
-					return
-				}
-				entryKey := entryKeys[entryKeyHex]
-				rq := &courierapi.GetRequest{Key: entryKey}
-				ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
-				rp, err := g.courier.Get(ctx, rq)
-				cancel()
-				if err != nil {
-					errs <- err
-					errored.setTrue()
-					return
-				}
-				entry, ok := rp.Value.Contents.(*libriapi.Document_Entry)
-				if !ok {
-					errs <- ErrDocNotEntry
-					errored.setTrue()
-					return
-				}
-				mu.Lock()
-				entryMetas[entryKeyHex] = &api.EntryMetadata{
-					CreatedTime:           entry.Entry.CreatedTime,
-					MetadataCiphertext:    entry.Entry.MetadataCiphertext,
-					MetadataCiphertextMac: entry.Entry.MetadataCiphertextMac,
-				}
-				mu.Unlock()
-				g.lg.Debug("got entry metadata",
-					zap.String(logEntryKeyShort, shortHex(entryKey)))
-				if errored.isTrue() {
-					return
-				}
-			}
-		}(wg1)
+		wg.Add(1)
+		go g.getWorker(wg, entryKeyHexsCh, errs, errored, entryKeys, mu, entryMetas)
 	}
-	wg1.Wait()
+	wg.Wait()
 
 	select {
 	case err := <-errs:
@@ -277,6 +262,52 @@ func (g *entryMetadataGetterImpl) get(
 	default:
 		g.lg.Debug("got all entry metadata", zap.Int(logNEntries, len(entryMetas)))
 		return entryMetas, nil
+	}
+}
+
+func (g *entryMetadataGetterImpl) getWorker(
+	wg *sync.WaitGroup,
+	entryKeyHexsCh chan string,
+	errs chan error,
+	errored *safeFlag,
+	entryKeys map[string][]byte,
+	mu sync.Locker,
+	entryMetas map[string]*api.EntryMetadata,
+
+) {
+	defer wg.Done()
+	for entryKeyHex := range entryKeyHexsCh {
+		if errored.isTrue() {
+			return
+		}
+		entryKey := entryKeys[entryKeyHex]
+		rq := &courierapi.GetRequest{Key: entryKey}
+		ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
+		rp, err := g.courier.Get(ctx, rq)
+		cancel()
+		if err != nil {
+			errs <- err
+			errored.setTrue()
+			return
+		}
+		entry, ok := rp.Value.Contents.(*libriapi.Document_Entry)
+		if !ok {
+			errs <- ErrDocNotEntry
+			errored.setTrue()
+			return
+		}
+		mu.Lock()
+		entryMetas[entryKeyHex] = &api.EntryMetadata{
+			CreatedTime:           entry.Entry.CreatedTime,
+			MetadataCiphertext:    entry.Entry.MetadataCiphertext,
+			MetadataCiphertextMac: entry.Entry.MetadataCiphertextMac,
+		}
+		mu.Unlock()
+		g.lg.Debug("got entry metadata",
+			zap.String(logEntryKeyShort, shortHex(entryKey)))
+		if errored.isTrue() {
+			return
+		}
 	}
 }
 
@@ -311,36 +342,15 @@ func (g *entitySummaryGetterImpl) get(
 
 	mu := new(sync.Mutex)
 	errs := make(chan error, g.parallelism)
-	errored := safeFlag{}
+	errored := &safeFlag{}
 	entitySummaries := make(map[string]*api.EntitySummary)
 
-	wg1 := new(sync.WaitGroup)
+	wg := new(sync.WaitGroup)
 	for c := uint(0); c < g.parallelism; c++ {
-		wg1.Add(1)
-		go func(wg2 *sync.WaitGroup) {
-			defer wg2.Done()
-			for entityID := range entityIDs {
-				rq := &directoryapi.GetEntityRequest{EntityId: entityID}
-				ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
-				rp, err := g.directory.GetEntity(ctx, rq)
-				cancel()
-				if err != nil {
-					errs <- err
-					errored.setTrue()
-					return
-				}
-				mu.Lock()
-				entitySummaries[entityID] = &api.EntitySummary{
-					EntityId: entityID,
-					Type:     rp.Entity.Type(),
-					Name:     "", // TODO rp.Entity.Name()
-				}
-				mu.Unlock()
-				g.lg.Debug("got entity summary", zap.String(logEntityID, entityID))
-			}
-		}(wg1)
+		wg.Add(1)
+		go g.getWorker(wg, entityIDsCh, errs, errored, entitySummaries, mu)
 	}
-	wg1.Wait()
+	wg.Wait()
 
 	select {
 	case err := <-errs:
@@ -348,6 +358,36 @@ func (g *entitySummaryGetterImpl) get(
 	default:
 		g.lg.Debug("got all entity summaries", zap.Int(logNEntities, len(entitySummaries)))
 		return entitySummaries, nil
+	}
+}
+
+func (g *entitySummaryGetterImpl) getWorker(
+	wg *sync.WaitGroup,
+	entityIDsCh chan string,
+	errs chan error,
+	errored *safeFlag,
+	entitySummaries map[string]*api.EntitySummary,
+	mu sync.Locker,
+) {
+	defer wg.Done()
+	for entityID := range entityIDsCh {
+		rq := &directoryapi.GetEntityRequest{EntityId: entityID}
+		ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
+		rp, err := g.directory.GetEntity(ctx, rq)
+		cancel()
+		if err != nil {
+			errs <- err
+			errored.setTrue()
+			return
+		}
+		mu.Lock()
+		entitySummaries[entityID] = &api.EntitySummary{
+			EntityId: entityID,
+			Type:     rp.Entity.Type(),
+			Name:     "", // TODO rp.Entity.Name()
+		}
+		mu.Unlock()
+		g.lg.Debug("got entity summary", zap.String(logEntityID, entityID))
 	}
 }
 
@@ -374,13 +414,13 @@ type safeFlag struct {
 	mu  sync.Mutex
 }
 
-func (sf safeFlag) setTrue() {
+func (sf *safeFlag) setTrue() {
 	sf.mu.Lock()
 	sf.val = true
 	sf.mu.Unlock()
 }
 
-func (sf safeFlag) isTrue() bool {
+func (sf *safeFlag) isTrue() bool {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
 	return sf.val

@@ -290,6 +290,7 @@ func TestEntryMetadataGetter(t *testing.T) {
 			},
 		}
 		envDocKey, err := libriapi.GetKey(envDoc)
+		assert.Nil(t, err)
 		c = &fixedCourier{
 			docs: map[string]*libriapi.Document{
 				envDocKey.String(): envDoc,

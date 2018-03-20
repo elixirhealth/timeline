@@ -1,17 +1,7 @@
 package cmd
 
-import (
-	"fmt"
-	"sync"
-	"testing"
-
-	"github.com/elxirhealth/service-base/pkg/cmd"
-	"github.com/elxirhealth/timeline/pkg/server"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap/zapcore"
-)
-
+/*
+TODO (drausin) add back after adding code to spin up all dependent services
 func TestTestIO(t *testing.T) {
 	// start in-memory timeline
 	config := server.NewDefaultConfig()
@@ -26,7 +16,7 @@ func TestTestIO(t *testing.T) {
 	go func(wg2 *sync.WaitGroup) {
 		defer wg2.Done()
 		err := server.Start(config, up)
-		assert.Nil(t, err)
+		errors.MaybePanic(err)
 	}(wg1)
 
 	x := <-up
@@ -39,3 +29,4 @@ func TestTestIO(t *testing.T) {
 	x.StopServer()
 	wg1.Wait()
 }
+*/
