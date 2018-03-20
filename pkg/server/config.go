@@ -1,21 +1,33 @@
 package server
 
 import (
+	"net"
+	"time"
+
 	"github.com/drausin/libri/libri/common/errors"
 	"github.com/elxirhealth/service-base/pkg/server"
-	"github.com/elxirhealth/timeline/pkg/server/storage"
 	"go.uber.org/zap/zapcore"
 )
 
 const (
-// TODO add default config values here
+	// DefaultParallelism is the default parallelism used for dependency requests.
+	DefaultParallelism = uint(4)
+
+	// DefaultRequestTimeout is the default time for requests made to dependency services.
+	DefaultRequestTimeout = 1 * time.Second
 )
 
 // Config is the config for a Timeline instance.
 type Config struct {
 	*server.BaseConfig
-	Storage *storage.Parameters
-	// TODO add config elements
+
+	RequestTimeout time.Duration
+	Parallelism    uint
+
+	Courier   *net.TCPAddr
+	Catalog   *net.TCPAddr
+	Directory *net.TCPAddr
+	User      *net.TCPAddr
 }
 
 // NewDefaultConfig create a new config instance with default values.
@@ -24,34 +36,73 @@ func NewDefaultConfig() *Config {
 		BaseConfig: server.NewDefaultBaseConfig(),
 	}
 	return config.
-		WithDefaultStorage()
-	// TODO add .WithDefaultCONFIGELEMENT for each CONFIGELEMENT
+		WithDefaultParallelism().
+		WithDefaultRequestTimeout()
 }
 
 // MarshalLogObject writes the config to the given object encoder.
 func (c *Config) MarshalLogObject(oe zapcore.ObjectEncoder) error {
 	err := c.BaseConfig.MarshalLogObject(oe)
 	errors.MaybePanic(err) // should never happen
-	err = oe.AddObject(logStorage, c.Storage)
-	errors.MaybePanic(err) // should never happen
 
-	// TODO add other config elements
+	oe.AddString(logCourier, c.Courier.String())
+	oe.AddString(logCatalog, c.Catalog.String())
+	oe.AddString(logDirectory, c.Directory.String())
+	oe.AddString(logUser, c.User.String())
 	return nil
 }
 
-// WithStorage sets the cache parameters to the given value or the defaults if it is nil.
-func (c *Config) WithStorage(p *storage.Parameters) *Config {
-	if p == nil {
-		return c.WithDefaultStorage()
+// WithParallelism sets the parallelism used by each getter.
+func (c *Config) WithParallelism(n uint) *Config {
+	if n == 0 {
+		return c.WithDefaultParallelism()
 	}
-	c.Storage = p
+	c.Parallelism = n
 	return c
 }
 
-// WithDefaultStorage set the Cache parameters to their default values.
-func (c *Config) WithDefaultStorage() *Config {
-	c.Storage = storage.NewDefaultParameters()
+// WithDefaultParallelism sets the getter parallelism to the default value.
+func (c *Config) WithDefaultParallelism() *Config {
+	c.Parallelism = DefaultParallelism
 	return c
 }
 
-// TODO add WithCONFIGELEMENT and WithDefaultCONFIGELEMENT methods for each CONFIGELEMENT
+// WithRequestTimeout sets the key Get request timeout to the given value or to the default
+// if it is zero-valued.
+func (c *Config) WithRequestTimeout(t time.Duration) *Config {
+	if t == 0 {
+		return c.WithDefaultRequestTimeout()
+	}
+	c.RequestTimeout = t
+	return c
+}
+
+// WithDefaultRequestTimeout sets the key request timeout to the default value.
+func (c *Config) WithDefaultRequestTimeout() *Config {
+	c.RequestTimeout = DefaultRequestTimeout
+	return c
+}
+
+// WithCourierAddr sets the catalog address to the given value.
+func (c *Config) WithCourierAddr(addr *net.TCPAddr) *Config {
+	c.Courier = addr
+	return c
+}
+
+// WithCatalogAddr sets the catalog addresses to the given value.
+func (c *Config) WithCatalogAddr(addr *net.TCPAddr) *Config {
+	c.Catalog = addr
+	return c
+}
+
+// WithDirectoryAddr sets the directory address to the given value.
+func (c *Config) WithDirectoryAddr(addr *net.TCPAddr) *Config {
+	c.Directory = addr
+	return c
+}
+
+// WithUserAddr sets the user address to the given value.
+func (c *Config) WithUserAddr(addr *net.TCPAddr) *Config {
+	c.User = addr
+	return c
+}
