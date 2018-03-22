@@ -18,7 +18,8 @@ jobs:
             - arch={{ arch }}-rocksdb=5.8-vendor={{ checksum "Gopkg.lock" }}
             - arch={{ arch }}-rocksdb=5.8
             - arch={{ arch }}
-      - run: make get-deps- run:
+      - run: make get-deps
+      - run:
           name: install RocksDB
           command: |
             # hack to make sure RocksDB runs on CircleCI machines
