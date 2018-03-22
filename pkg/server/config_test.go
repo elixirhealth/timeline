@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestNewDefaultConfig(t *testing.T) {
@@ -12,6 +14,13 @@ func TestNewDefaultConfig(t *testing.T) {
 	assert.NotNil(t, c)
 	assert.NotEmpty(t, c.RequestTimeout)
 	assert.NotEmpty(t, c.Parallelism)
+}
+
+func TestConfig_MarshalLogObject(t *testing.T) {
+	oe := zapcore.NewJSONEncoder(zap.NewDevelopmentEncoderConfig())
+	c := NewDefaultConfig()
+	err := c.MarshalLogObject(oe)
+	assert.Nil(t, err)
 }
 
 func TestConfig_WithParallelism(t *testing.T) {
