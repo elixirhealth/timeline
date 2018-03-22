@@ -144,8 +144,8 @@ func tearDown(t *testing.T, st *state) {
 	err = syscall.Kill(-pgid, syscall.SIGKILL)
 	errors.MaybePanic(err)
 
-	logger := &migrations.ZapLogger{Logger: logging.NewDevInfoLogger()}
-	m := migrations.NewBindataMigrator(
+	logger := &bstorage.ZapLogger{Logger: logging.NewDevInfoLogger()}
+	m := bstorage.NewBindataMigrator(
 		st.dbURL,
 		bindata.Resource(migrations.AssetNames(), migrations.Asset),
 		logger,
@@ -303,7 +303,7 @@ func createAndStartDirectory(params *parameters, st *state) {
 func newDirectoryConfigs(params *parameters, st *state) (*dirserver.Config, *net.TCPAddr) {
 	startPort := 10400
 	storageParams := storage.NewDefaultParameters()
-	storageParams.Type = storage.Postgres
+	storageParams.Type = bstorage.Postgres
 
 	serverPort, metricsPort := startPort, startPort+1
 	config := dirserver.NewDefaultConfig().
