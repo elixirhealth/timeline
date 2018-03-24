@@ -5,7 +5,6 @@ package acceptance
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -58,6 +57,7 @@ type parameters struct {
 	nUserEntities int
 	nEntityKeys   int
 	nEntryDocs    int
+	nMaxShares    int
 
 	rqTimeout     time.Duration
 	gcpProjectID  string
@@ -189,9 +189,6 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 		}
 	}
 
-	// create docs in courier
-	// create publications for entities catalog
-
 }
 
 func getUserID(userIdx int) string {
@@ -214,7 +211,7 @@ func setUp(params *parameters) *state {
 	createAndStartDirectory(params, st)
 	createAndStartUser(params, st)
 
-	return nil
+	return st
 }
 
 func tearDown(t *testing.T, st *state) {
@@ -252,7 +249,6 @@ func startDatastoreEmulator(params *parameters, st *state) {
 	err := cmd.Start()
 	errors.MaybePanic(err)
 	st.datastoreEmulator = cmd.Process
-	log.Printf("datastore PID: %d\n", st.datastoreEmulator.Pid)
 	os.Setenv(datastoreEmulatorHostEnv, params.datastoreAddr)
 }
 
@@ -293,7 +289,8 @@ func newCourierConfig(st *state, params *parameters) (*cserver.Config, *net.TCPA
 		WithKeyAddr(st.keyAddr).
 		WithCache(cacheParams).
 		WithGCPProjectID(params.gcpProjectID).
-		WithNLibriPutters(0)
+		WithNLibriPutters(0).
+		WithNCatalogPutters(0)
 	config.WithServerPort(uint(serverPort)).
 		WithMetricsPort(uint(serverPort + 1)).
 		WithLogLevel(params.courierLogLevel)
