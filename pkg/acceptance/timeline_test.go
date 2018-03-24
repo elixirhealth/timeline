@@ -120,7 +120,7 @@ func TestAcceptance(t *testing.T) {
 		nUsers:        8,
 		nUserEntities: 2,
 		nEntityKeys:   32,
-		nEntryDocs:    128,
+		nEntryDocs:    64,
 		nMaxShares:    2,
 
 		rqTimeout:         10 * time.Second, // very large b/c there are lots of services
@@ -159,9 +159,12 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 
 		timelineEntries := make(map[string]struct{})
 		for _, ev := range rp.Events {
-			timelineEntries[hex.EncodeToString(ev.Envelope.EntryKey)] = struct{}{}
+			entryKeyHex := hex.EncodeToString(ev.Envelope.EntryKey)
+			//timelineEntries[] = struct{}{}
+			_, in := st.userEntries[userID][entryKeyHex]
+			assert.True(t, in)
 		}
-		assert.Equal(t, st.userEntries[userID], timelineEntries)
+		assert.Equal(t, len(st.userEntries[userID]), len(timelineEntries))
 	}
 }
 
@@ -258,7 +261,13 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 		// share with some others
 		nShares := st.rng.Intn(params.nMaxShares)
 		for d := 0; d < nShares; d++ {
-			readerEntityID, readerUserID := getRandEntityID(st, params)
+			readerUserID := userID
+			var readerEntityID string
+			for readerUserID == userID {
+				// want user shared with to be diff than author
+				readerEntityID, readerUserID = getRandEntityID(st, params)
+			}
+
 			readerPubKey = getRandPubKey(st, params, readerEntityID,
 				keyapi.KeyType_READER)
 			err = shareEnv(st, params, entryDocKey, authorPubKey, readerPubKey)
@@ -437,7 +446,7 @@ func newTimelineConfigs(st *state, params *parameters) ([]*server.Config, []*net
 		configs[i] = server.NewDefaultConfig().
 			WithCourierAddr(st.courierAddr).
 			WithCatalogAddr(st.catalogAddr).
-			WithDirectoryAddr(st.keyAddr).
+			WithDirectoryAddr(st.directoryAddr).
 			WithUserAddr(st.userAddr)
 		configs[i].WithServerPort(uint(serverPort)).
 			WithMetricsPort(uint(metricsPort)).

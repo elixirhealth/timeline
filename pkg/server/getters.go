@@ -29,8 +29,8 @@ type entityIDGetterImpl struct {
 func (g *entityIDGetterImpl) get(userID string) ([]string, error) {
 	rq := &userapi.GetEntitiesRequest{UserId: userID}
 	ctx, cancel := context.WithTimeout(context.Background(), g.rqTimeout)
-	defer cancel()
 	rp, err := g.user.GetEntities(ctx, rq)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
