@@ -166,8 +166,12 @@ func TestTimeline_Get_ok(t *testing.T) {
 	rp, err := tl.Get(context.Background(), rq)
 	assert.Nil(t, err)
 	assert.Equal(t, len(prs), len(rp.Events))
-	for _, event := range rp.Events {
+	for i, event := range rp.Events {
 		assert.NotEmpty(t, event.Time)
+		if i > 0 {
+			// check descending time event ordering
+			assert.True(t, event.Time < rp.Events[i-1].Time)
+		}
 		assert.NotEmpty(t, event.Envelope)
 		assert.NotEmpty(t, event.EntryMetadata)
 		assert.NotEmpty(t, event.Reader)

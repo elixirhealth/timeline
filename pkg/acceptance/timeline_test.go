@@ -127,11 +127,11 @@ func TestAcceptance(t *testing.T) {
 		datastoreAddr:     "localhost:2001",
 		gcpProjectID:      "dummy-acceptance-id",
 		timelineLogLevel:  zapcore.InfoLevel,
-		catalogLogLevel:   zapcore.ErrorLevel,
-		courierLogLevel:   zapcore.ErrorLevel,
-		directoryLogLevel: zapcore.ErrorLevel,
-		keyLogLevel:       zapcore.ErrorLevel,
-		userLogLevel:      zapcore.DebugLevel,
+		catalogLogLevel:   zapcore.InfoLevel,
+		courierLogLevel:   zapcore.InfoLevel,
+		directoryLogLevel: zapcore.InfoLevel,
+		keyLogLevel:       zapcore.InfoLevel,
+		userLogLevel:      zapcore.InfoLevel,
 	}
 	st := setUp(params)
 
@@ -144,6 +144,7 @@ func TestAcceptance(t *testing.T) {
 
 func testGetTimeline(t *testing.T, params *parameters, st *state) {
 	for i := 0; i < params.nUsers; i++ {
+		userID := getUserID(i)
 		tlClient := st.timelineClients[st.rng.Intn(len(st.timelineClients))]
 
 		ctx, cancel := params.getCtx()
@@ -155,7 +156,11 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 		assert.Nil(t, err)
 		assert.True(t, len(rp.Events) > 0)
 
-		// TODO (drausin) more extensive checks
+		timelineEntries := make(map[string]struct{})
+		for _, ev := range rp.Events {
+			timelineEntries[hex.EncodeToString(ev.Envelope.EntryKey)] = struct{}{}
+		}
+		assert.Equal(t, st.userEntries[userID], timelineEntries)
 	}
 }
 

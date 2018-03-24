@@ -10,6 +10,7 @@ import (
 	api "github.com/elxirhealth/timeline/pkg/timelineapi"
 	userclient "github.com/elxirhealth/user/pkg/client"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )
 
@@ -123,6 +124,7 @@ func newTimeline(config *Config) (*Timeline, error) {
 func (t *Timeline) Get(
 	ctx context.Context, rq *api.GetRequest,
 ) (*api.GetResponse, error) {
+	t.Logger.Debug("received Get request", zap.String("user_id", rq.UserId))
 	if err := api.ValidateGetRequest(rq); err != nil {
 		return nil, err
 	}
@@ -163,6 +165,6 @@ func (t *Timeline) Get(
 			Author:        entitySummaries[pr.AuthorEntityId],
 		}
 	}
-
+	t.Logger.Info("got events", zap.String("user_id", rq.UserId), zap.Int("n_events", len(events)))
 	return &api.GetResponse{Events: events}, nil
 }
