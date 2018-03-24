@@ -147,12 +147,13 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 		userID := getUserID(i)
 		tlClient := st.timelineClients[st.rng.Intn(len(st.timelineClients))]
 
-		ctx, cancel := params.getCtx()
+		//ctx, cancel := params.getCtx()
+		ctx := context.Background()
 		rp, err := tlClient.Get(ctx, &api.GetRequest{
 			UserId:    getUserID(i),
 			TimeRange: &api.TimeRange{},
 		})
-		cancel()
+		//cancel()
 		assert.Nil(t, err)
 		assert.True(t, len(rp.Events) > 0)
 
