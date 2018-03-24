@@ -3,6 +3,7 @@
 package acceptance
 
 import (
+	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -94,7 +95,7 @@ func TestAcceptance(t *testing.T) {
 	params := &parameters{
 		nTimelines:        3,
 		rqTimeout:         1 * time.Second,
-		gcpProjectID:      "dummy-acceptance-id",
+		datastoreAddr:     "localhost:2001",
 		timelineLogLevel:  zapcore.InfoLevel,
 		catalogLogLevel:   zapcore.InfoLevel,
 		courierLogLevel:   zapcore.InfoLevel,
@@ -172,6 +173,7 @@ func startDatastoreEmulator(params *parameters, st *state) {
 	err := cmd.Start()
 	errors.MaybePanic(err)
 	st.datastoreEmulator = cmd.Process
+	log.Printf("datastore PID: %d\n", st.datastoreEmulator.Pid)
 	os.Setenv(datastoreEmulatorHostEnv, params.datastoreAddr)
 }
 
@@ -211,7 +213,8 @@ func newCourierConfig(st *state, params *parameters) (*cserver.Config, *net.TCPA
 		WithCatalogAddr(st.catalogAddr).
 		WithKeyAddr(st.keyAddr).
 		WithCache(cacheParams).
-		WithGCPProjectID(params.gcpProjectID)
+		WithGCPProjectID(params.gcpProjectID).
+		WithNLibriPutters(0)
 	config.WithServerPort(uint(serverPort)).
 		WithMetricsPort(uint(serverPort + 1)).
 		WithLogLevel(params.courierLogLevel)
