@@ -3,7 +3,6 @@ jobs:
   build:
     docker:
       - image: gcr.io/elxir-core-infra/service-base-build:latest
-        user: builder
         auth:
           username: _json_key
           password: ${GCR_SVC_JSON}
