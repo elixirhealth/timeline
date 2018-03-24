@@ -461,6 +461,7 @@ func createAndStartCourier(params *parameters, st *state) {
 	courierClient, err := cclient.NewInsecure(addr.String())
 	errors.MaybePanic(err)
 	st.courier = courier
+	st.courierAddr = addr
 	st.courierClient = courierClient
 }
 
@@ -570,8 +571,8 @@ func createAndStartDirectory(params *parameters, st *state) {
 	}()
 
 	// wait for server to come up
-	directory := <-up
-	st.directory = directory
+	st.directory = <-up
+	st.directoryAddr = addr
 	cl, err := dirclient.NewInsecure(addr.String())
 	errors.MaybePanic(err)
 	st.directoryClient = cl
@@ -603,8 +604,8 @@ func createAndStartUser(params *parameters, st *state) {
 	}()
 
 	// wait for server to come up
-	user := <-up
-	st.user = user
+	st.user = <-up
+	st.userAddr = addr
 	cl, err := userclient.NewInsecure(addr.String())
 	errors.MaybePanic(err)
 	st.userClient = cl
