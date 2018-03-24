@@ -149,7 +149,16 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 			// add entity
 			ctx, cancel := params.getCtx()
 			rp, err := st.directory.PutEntity(ctx, &dirapi.PutEntityRequest{
-				Entity: dirapi.NewTestPatient(i*params.nUserEntities+j, false),
+				Entity: dirapi.NewPatient("", &dirapi.Patient{
+					LastName:   fmt.Sprintf("Last Name %d", i),
+					FirstName:  fmt.Sprintf("First Name %d", i),
+					MiddleName: fmt.Sprintf("Middle Name %d", i),
+					Birthdate: &dirapi.Date{
+						Year:  2006,
+						Month: 1 + uint32(i/28),
+						Day:   1 + uint32(i%28),
+					},
+				}),
 			})
 			cancel()
 			assert.Nil(t, err)
