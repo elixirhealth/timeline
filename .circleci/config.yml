@@ -44,5 +44,6 @@ jobs:
       - run:
           name: acceptance test
           command: |
-            su - builder
+            su - builder  # Postgres can't be run as root
+            cd /go/src/github.com/elxirhealth/timeline
             make acceptance
