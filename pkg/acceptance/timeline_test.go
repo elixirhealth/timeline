@@ -117,7 +117,7 @@ func TestAcceptance(t *testing.T) {
 		nEntryDocs:    256,
 		nMaxShares:    2,
 
-		rqTimeout:         1 * time.Second,
+		rqTimeout:         3 * time.Second,
 		datastoreAddr:     "localhost:2001",
 		gcpProjectID:      "dummy-acceptance-id",
 		timelineLogLevel:  zapcore.InfoLevel,
