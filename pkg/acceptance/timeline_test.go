@@ -36,6 +36,8 @@ import (
 	keystorage "github.com/elxirhealth/key/pkg/server/storage"
 	bstorage "github.com/elxirhealth/service-base/pkg/server/storage"
 	"github.com/elxirhealth/service-base/pkg/util"
+	"github.com/elxirhealth/timeline/pkg/client"
+	"github.com/elxirhealth/timeline/pkg/server"
 	api "github.com/elxirhealth/timeline/pkg/timelineapi"
 	userclient "github.com/elxirhealth/user/pkg/client"
 	userserver "github.com/elxirhealth/user/pkg/server"
@@ -65,8 +67,7 @@ type parameters struct {
 	gcpProjectID  string
 	datastoreAddr string
 
-	timelineLogLevel zapcore.Level
-
+	timelineLogLevel  zapcore.Level
 	catalogLogLevel   zapcore.Level
 	courierLogLevel   zapcore.Level
 	directoryLogLevel zapcore.Level
@@ -79,12 +80,14 @@ func (p *parameters) getCtx() (context.Context, context.CancelFunc) {
 }
 
 type state struct {
+	timelines []*server.Timeline
 	courier   *cserver.Courier
 	catalog   *catserver.Catalog
 	directory *dirserver.Directory
 	key       *keyserver.Key
 	user      *userserver.User
 
+	timelineClients []api.TimelineClient
 	directoryClient dirapi.DirectoryClient
 	courierClient   courierapi.CourierClient
 	catalogClient   catalogapi.CatalogClient
@@ -118,7 +121,7 @@ func TestAcceptance(t *testing.T) {
 		nEntryDocs:    128,
 		nMaxShares:    2,
 
-		rqTimeout:         10 * time.Second,
+		rqTimeout:         10 * time.Second, // very large b/c there are lots of services
 		datastoreAddr:     "localhost:2001",
 		gcpProjectID:      "dummy-acceptance-id",
 		timelineLogLevel:  zapcore.InfoLevel,
@@ -132,19 +135,27 @@ func TestAcceptance(t *testing.T) {
 
 	createEvents(t, params, st)
 
-	//testGetTimeline(t, params, st)
+	testGetTimeline(t, params, st)
 
 	tearDown(t, st)
 }
 
-/*
 func testGetTimeline(t *testing.T, params *parameters, st *state) {
 	for i := 0; i < params.nUsers; i++ {
-		userID := getUserID(i)
-		client := st.timelineClients[st.rng.Intn(len(st.courierClients))]
+		tlClient := st.timelineClients[st.rng.Intn(len(st.timelineClients))]
+
+		ctx, cancel := params.getCtx()
+		rp, err := tlClient.Get(ctx, &api.GetRequest{
+			UserId:    getUserID(i),
+			TimeRange: &api.TimeRange{},
+		})
+		cancel()
+		assert.Nil(t, err)
+		assert.True(t, len(rp.Events) > 0)
+
+		// TODO (drausin) more extensive checks
 	}
 }
-*/
 
 func createEvents(t *testing.T, params *parameters, st *state) {
 	st.userEntityIDs = make([][]string, params.nUsers)
@@ -374,6 +385,51 @@ func startDatastoreEmulator(params *parameters, st *state) {
 	errors.MaybePanic(err)
 	st.datastoreEmulator = cmd.Process
 	os.Setenv(datastoreEmulatorHostEnv, params.datastoreAddr)
+}
+
+func createAndStartTimelines(params *parameters, st *state) {
+	configs, addrs := newTimelineConfigs(st, params)
+	timelines := make([]*server.Timeline, params.nTimelines)
+	timelineClients := make([]api.TimelineClient, params.nTimelines)
+	up := make(chan *server.Timeline, 1)
+
+	for i := 0; i < params.nTimelines; i++ {
+		go func() {
+			err := server.Start(configs[i], up)
+			errors.MaybePanic(err)
+		}()
+
+		// wait for timeline to come up
+		timelines[i] = <-up
+
+		// set up timeline client for it
+		cl, err := client.NewInsecure(addrs[i].String())
+		errors.MaybePanic(err)
+		timelineClients[i] = cl
+	}
+
+	st.timelines = timelines
+	st.timelineClients = timelineClients
+}
+
+func newTimelineConfigs(st *state, params *parameters) ([]*server.Config, []*net.TCPAddr) {
+	startPort := 10000
+	configs := make([]*server.Config, params.nTimelines)
+	addrs := make([]*net.TCPAddr, params.nTimelines)
+
+	for i := 0; i < params.nTimelines; i++ {
+		serverPort, metricsPort := startPort+i*10, startPort+i*10+1
+		configs[i] = server.NewDefaultConfig().
+			WithCourierAddr(st.courierAddr).
+			WithCatalogAddr(st.catalogAddr).
+			WithDirectoryAddr(st.keyAddr).
+			WithUserAddr(st.userAddr)
+		configs[i].WithServerPort(uint(serverPort)).
+			WithMetricsPort(uint(metricsPort)).
+			WithLogLevel(params.timelineLogLevel)
+		addrs[i] = &net.TCPAddr{IP: net.ParseIP("localhost"), Port: serverPort}
+	}
+	return configs, addrs
 }
 
 func createAndStartCourier(params *parameters, st *state) {
