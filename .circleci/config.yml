@@ -41,4 +41,8 @@ jobs:
       - run: make docker-image
       - run: make test
       - run: make lint
-      - run: su - builder && make acceptance
+      - run:
+          name: acceptance test
+          command: |
+            su - builder
+            make acceptance
