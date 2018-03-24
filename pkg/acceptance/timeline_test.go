@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cenkalti/backoff"
 	"github.com/drausin/libri/libri/common/errors"
 	"github.com/drausin/libri/libri/common/logging"
 	libriapi "github.com/drausin/libri/libri/librarian/api"
@@ -114,7 +115,7 @@ func TestAcceptance(t *testing.T) {
 		nUsers:        16,
 		nUserEntities: 4,
 		nEntityKeys:   64,
-		nEntryDocs:    256,
+		nEntryDocs:    128,
 		nMaxShares:    2,
 
 		rqTimeout:         3 * time.Second,
@@ -167,10 +168,14 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 
 			// add entity to user
 			ctx, cancel = params.getCtx()
-			_, err = st.userClient.AddEntity(ctx, &userapi.AddEntityRequest{
-				UserId:   userID,
-				EntityId: rp.EntityId,
-			})
+			op := func() error {
+				_, err = st.userClient.AddEntity(ctx, &userapi.AddEntityRequest{
+					UserId:   userID,
+					EntityId: rp.EntityId,
+				})
+				return err
+			}
+			err = backoff.Retry(op, newTimeoutExpBackoff(params.rqTimeout))
 			cancel()
 			assert.Nil(t, err)
 
@@ -297,6 +302,12 @@ func getRandPubKey(st *state, params *parameters, entityID string, kt keyapi.Key
 
 func getUserID(userIdx int) string {
 	return fmt.Sprintf("User-%d", userIdx)
+}
+
+func newTimeoutExpBackoff(timeout time.Duration) backoff.BackOff {
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = timeout
+	return bo
 }
 
 func setUp(params *parameters) *state {
