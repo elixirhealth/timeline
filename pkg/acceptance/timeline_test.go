@@ -138,6 +138,9 @@ func TestAcceptance(t *testing.T) {
 
 func createEvents(t *testing.T, params *parameters, st *state) {
 	st.userEntityIDs = make([][]string, params.nUsers)
+	st.entityAuthorPubKeys = make(map[string][][]byte)
+	st.entityReaderPubKeys = make(map[string][][]byte)
+
 	for i := 0; i < params.nUsers; i++ {
 		userID := getUserID(i)
 		st.userEntityIDs[i] = make([]string, params.nUserEntities)
