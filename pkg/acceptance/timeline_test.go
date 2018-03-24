@@ -4,6 +4,7 @@ package acceptance
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net"
@@ -103,6 +104,7 @@ type state struct {
 	userEntityIDs       [][]string
 	entityReaderPubKeys map[string][][]byte
 	entityAuthorPubKeys map[string][][]byte
+	userEntries         map[string]map[string]struct{}
 
 	rng               *rand.Rand
 	dataDir           string
@@ -159,12 +161,14 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 
 func createEvents(t *testing.T, params *parameters, st *state) {
 	st.userEntityIDs = make([][]string, params.nUsers)
+	st.userEntries = make(map[string]map[string]struct{})
 	st.entityAuthorPubKeys = make(map[string][][]byte)
 	st.entityReaderPubKeys = make(map[string][][]byte)
 
 	for i := 0; i < params.nUsers; i++ {
 		userID := getUserID(i)
 		st.userEntityIDs[i] = make([]string, params.nUserEntities)
+		st.userEntries[userID] = make(map[string]struct{})
 		for j := 0; j < params.nUserEntities; j++ {
 
 			// add entity
@@ -231,26 +235,29 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 
 	// create entries and share them with other entities
 	for c := 0; c < params.nEntryDocs; c++ {
-		entityID := getRandEntityID(st, params)
+		entityID, userID := getRandEntityID(st, params)
 		authorPubKey := getRandPubKey(st, params, entityID, keyapi.KeyType_AUTHOR)
 		readerPubKey := getRandPubKey(st, params, entityID, keyapi.KeyType_READER)
 
 		// put entry
 		entryDocKey, err := putEntry(st, params, authorPubKey)
 		assert.Nil(t, err)
+		entryDocKeyHex := hex.EncodeToString(entryDocKey)
 
 		// share with self
 		err = shareEnv(st, params, entryDocKey, authorPubKey, readerPubKey)
 		assert.Nil(t, err)
+		st.userEntries[userID][entryDocKeyHex] = struct{}{}
 
 		// share with some others
 		nShares := st.rng.Intn(params.nMaxShares)
 		for d := 0; d < nShares; d++ {
-			readerEntityID := getRandEntityID(st, params)
+			readerEntityID, readerUserID := getRandEntityID(st, params)
 			readerPubKey = getRandPubKey(st, params, readerEntityID,
 				keyapi.KeyType_READER)
 			err = shareEnv(st, params, entryDocKey, authorPubKey, readerPubKey)
 			assert.Nil(t, err)
+			st.userEntries[readerUserID][entryDocKeyHex] = struct{}{}
 		}
 	}
 }
@@ -306,10 +313,10 @@ func shareEnv(st *state, params *parameters, entryKey, authorPubKey, readerPubKe
 	return err
 }
 
-func getRandEntityID(st *state, params *parameters) string {
+func getRandEntityID(st *state, params *parameters) (string, string) {
 	userIdx := st.rng.Intn(params.nUsers)
 	entityIdx := st.rng.Intn(params.nUserEntities)
-	return st.userEntityIDs[userIdx][entityIdx]
+	return st.userEntityIDs[userIdx][entityIdx], getUserID(userIdx)
 }
 
 func getRandPubKey(st *state, params *parameters, entityID string, kt keyapi.KeyType) []byte {
@@ -345,6 +352,8 @@ func setUp(params *parameters) *state {
 	createAndStartCourier(params, st)
 	createAndStartDirectory(params, st)
 	createAndStartUser(params, st)
+
+	createAndStartTimelines(params, st)
 
 	return st
 }
