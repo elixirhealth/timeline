@@ -112,9 +112,9 @@ type state struct {
 func TestAcceptance(t *testing.T) {
 	params := &parameters{
 		nTimelines:    3,
-		nUsers:        16,
-		nUserEntities: 4,
-		nEntityKeys:   64,
+		nUsers:        8,
+		nUserEntities: 2,
+		nEntityKeys:   32,
 		nEntryDocs:    128,
 		nMaxShares:    2,
 
