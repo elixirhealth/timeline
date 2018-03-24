@@ -3,6 +3,8 @@
 package acceptance
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -32,6 +34,7 @@ import (
 	"github.com/elxirhealth/key/pkg/keyapi"
 	keystorage "github.com/elxirhealth/key/pkg/server/storage"
 	bstorage "github.com/elxirhealth/service-base/pkg/server/storage"
+	"github.com/elxirhealth/service-base/pkg/util"
 	api "github.com/elxirhealth/timeline/pkg/timelineapi"
 	userclient "github.com/elxirhealth/user/pkg/client"
 	userserver "github.com/elxirhealth/user/pkg/server"
@@ -51,6 +54,11 @@ const (
 type parameters struct {
 	nTimelines int
 
+	nUsers        int
+	nUserEntities int
+	nEntityKeys   int
+	nEntryDocs    int
+
 	rqTimeout     time.Duration
 	gcpProjectID  string
 	datastoreAddr string
@@ -62,6 +70,10 @@ type parameters struct {
 	directoryLogLevel zapcore.Level
 	keyLogLevel       zapcore.Level
 	userLogLevel      zapcore.Level
+}
+
+func (p *parameters) getCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), p.rqTimeout)
 }
 
 type state struct {
@@ -83,6 +95,10 @@ type state struct {
 	keyAddr       *net.TCPAddr
 	userAddr      *net.TCPAddr
 
+	userEntityIDs       [][]string
+	entityReaderPubKeys map[string][][]byte
+	entityAuthorPubKeys map[string][][]byte
+
 	rng               *rand.Rand
 	dataDir           string
 	events            map[string][]*api.Event
@@ -93,9 +109,15 @@ type state struct {
 
 func TestAcceptance(t *testing.T) {
 	params := &parameters{
-		nTimelines:        3,
+		nTimelines:    3,
+		nUsers:        16,
+		nUserEntities: 4,
+		nEntityKeys:   64,
+		nEntryDocs:    256,
+
 		rqTimeout:         1 * time.Second,
 		datastoreAddr:     "localhost:2001",
+		gcpProjectID:      "dummy-acceptance-id",
 		timelineLogLevel:  zapcore.InfoLevel,
 		catalogLogLevel:   zapcore.InfoLevel,
 		courierLogLevel:   zapcore.InfoLevel,
@@ -105,11 +127,6 @@ func TestAcceptance(t *testing.T) {
 	}
 	st := setUp(params)
 
-	// create users in user service
-	// create entities for users in directory service
-	// create docs in courier
-	// create publications for entities catalog
-
 	// get timelines for different users
 
 	tearDown(t, st)
@@ -117,6 +134,68 @@ func TestAcceptance(t *testing.T) {
 
 func createEvents(t *testing.T, params *parameters, st *state) {
 
+	st.userEntityIDs = make([][]string, params.nUsers)
+	for i := 0; i < params.nUsers; i++ {
+		userID := getUserID(i)
+		st.userEntityIDs[i] = make([]string, params.nUserEntities)
+		for j := 0; j < params.nUserEntities; j++ {
+
+			// add entity
+			ctx, cancel := params.getCtx()
+			rp, err := st.directory.PutEntity(ctx, &dirapi.PutEntityRequest{
+				Entity: dirapi.NewTestPatient(i*params.nUserEntities+j, false),
+			})
+			cancel()
+			assert.Nil(t, err)
+			entityID := rp.EntityId
+			st.userEntityIDs[i][j] = entityID
+
+			// add entity to user
+			ctx, cancel = params.getCtx()
+			_, err = st.user.AddEntity(ctx, &userapi.AddEntityRequest{
+				UserId:   userID,
+				EntityId: rp.EntityId,
+			})
+			cancel()
+			assert.Nil(t, err)
+
+			// create author and reader keys for entity
+			authorKeys := make([][]byte, params.nEntityKeys)
+			readerKeys := make([][]byte, params.nEntityKeys)
+			for i := range authorKeys {
+				authorKeys[i] = util.RandBytes(st.rng, 33)
+				readerKeys[i] = util.RandBytes(st.rng, 33)
+			}
+			st.entityAuthorPubKeys[entityID] = authorKeys
+			st.entityReaderPubKeys[entityID] = readerKeys
+
+			ctx, cancel = params.getCtx()
+			_, err = st.key.AddPublicKeys(ctx, &keyapi.AddPublicKeysRequest{
+				EntityId:   entityID,
+				KeyType:    keyapi.KeyType_AUTHOR,
+				PublicKeys: authorKeys,
+			})
+			cancel()
+			assert.Nil(t, err)
+
+			ctx, cancel = params.getCtx()
+			_, err = st.key.AddPublicKeys(ctx, &keyapi.AddPublicKeysRequest{
+				EntityId:   entityID,
+				KeyType:    keyapi.KeyType_READER,
+				PublicKeys: readerKeys,
+			})
+			cancel()
+			assert.Nil(t, err)
+		}
+	}
+
+	// create docs in courier
+	// create publications for entities catalog
+
+}
+
+func getUserID(userIdx int) string {
+	return fmt.Sprintf("User-%d", userIdx)
 }
 
 func setUp(params *parameters) *state {
