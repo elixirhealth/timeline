@@ -122,20 +122,29 @@ func TestAcceptance(t *testing.T) {
 		datastoreAddr:     "localhost:2001",
 		gcpProjectID:      "dummy-acceptance-id",
 		timelineLogLevel:  zapcore.InfoLevel,
-		catalogLogLevel:   zapcore.InfoLevel,
-		courierLogLevel:   zapcore.InfoLevel,
-		directoryLogLevel: zapcore.InfoLevel,
-		keyLogLevel:       zapcore.InfoLevel,
-		userLogLevel:      zapcore.InfoLevel,
+		catalogLogLevel:   zapcore.ErrorLevel,
+		courierLogLevel:   zapcore.ErrorLevel,
+		directoryLogLevel: zapcore.ErrorLevel,
+		keyLogLevel:       zapcore.ErrorLevel,
+		userLogLevel:      zapcore.DebugLevel,
 	}
 	st := setUp(params)
 
 	createEvents(t, params, st)
 
-	// get timelines for different users
+	//testGetTimeline(t, params, st)
 
 	tearDown(t, st)
 }
+
+/*
+func testGetTimeline(t *testing.T, params *parameters, st *state) {
+	for i := 0; i < params.nUsers; i++ {
+		userID := getUserID(i)
+		client := st.timelineClients[st.rng.Intn(len(st.courierClients))]
+	}
+}
+*/
 
 func createEvents(t *testing.T, params *parameters, st *state) {
 	st.userEntityIDs = make([][]string, params.nUsers)
