@@ -16,6 +16,7 @@ import (
 
 	"github.com/drausin/libri/libri/common/errors"
 	"github.com/drausin/libri/libri/common/logging"
+	libriapi "github.com/drausin/libri/libri/librarian/api"
 	"github.com/elxirhealth/catalog/pkg/catalogapi"
 	catclient "github.com/elxirhealth/catalog/pkg/client"
 	catserver "github.com/elxirhealth/catalog/pkg/server"
@@ -114,6 +115,7 @@ func TestAcceptance(t *testing.T) {
 		nUserEntities: 4,
 		nEntityKeys:   64,
 		nEntryDocs:    256,
+		nMaxShares:    2,
 
 		rqTimeout:         1 * time.Second,
 		datastoreAddr:     "localhost:2001",
@@ -127,13 +129,14 @@ func TestAcceptance(t *testing.T) {
 	}
 	st := setUp(params)
 
+	createEvents(t, params, st)
+
 	// get timelines for different users
 
 	tearDown(t, st)
 }
 
 func createEvents(t *testing.T, params *parameters, st *state) {
-
 	st.userEntityIDs = make([][]string, params.nUsers)
 	for i := 0; i < params.nUsers; i++ {
 		userID := getUserID(i)
@@ -152,7 +155,7 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 
 			// add entity to user
 			ctx, cancel = params.getCtx()
-			_, err = st.user.AddEntity(ctx, &userapi.AddEntityRequest{
+			_, err = st.userClient.AddEntity(ctx, &userapi.AddEntityRequest{
 				UserId:   userID,
 				EntityId: rp.EntityId,
 			})
@@ -170,7 +173,7 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 			st.entityReaderPubKeys[entityID] = readerKeys
 
 			ctx, cancel = params.getCtx()
-			_, err = st.key.AddPublicKeys(ctx, &keyapi.AddPublicKeysRequest{
+			_, err = st.keyClient.AddPublicKeys(ctx, &keyapi.AddPublicKeysRequest{
 				EntityId:   entityID,
 				KeyType:    keyapi.KeyType_AUTHOR,
 				PublicKeys: authorKeys,
@@ -179,7 +182,7 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 			assert.Nil(t, err)
 
 			ctx, cancel = params.getCtx()
-			_, err = st.key.AddPublicKeys(ctx, &keyapi.AddPublicKeysRequest{
+			_, err = st.keyClient.AddPublicKeys(ctx, &keyapi.AddPublicKeysRequest{
 				EntityId:   entityID,
 				KeyType:    keyapi.KeyType_READER,
 				PublicKeys: readerKeys,
@@ -189,6 +192,94 @@ func createEvents(t *testing.T, params *parameters, st *state) {
 		}
 	}
 
+	// create entries and share them with other entities
+	for c := 0; c < params.nEntryDocs; c++ {
+		entityID := getRandEntityID(st, params)
+		authorPubKey := getRandPubKey(st, params, entityID, keyapi.KeyType_AUTHOR)
+		readerPubKey := getRandPubKey(st, params, entityID, keyapi.KeyType_READER)
+
+		// put entry
+		entryDocKey, err := putEntry(st, params, authorPubKey)
+		assert.Nil(t, err)
+
+		// share with self
+		err = shareEnv(st, params, entryDocKey, authorPubKey, readerPubKey)
+		assert.Nil(t, err)
+
+		// share with some others
+		nShares := st.rng.Intn(params.nMaxShares)
+		for d := 0; d < nShares; d++ {
+			readerEntityID := getRandEntityID(st, params)
+			readerPubKey = getRandPubKey(st, params, readerEntityID,
+				keyapi.KeyType_READER)
+			err = shareEnv(st, params, entryDocKey, authorPubKey, readerPubKey)
+			assert.Nil(t, err)
+		}
+	}
+}
+
+func putEntry(st *state, params *parameters, authorPubKey []byte) ([]byte, error) {
+	entryDoc := &libriapi.Document{
+		Contents: &libriapi.Document_Entry{
+			Entry: &libriapi.Entry{
+				AuthorPublicKey: authorPubKey,
+				Page: &libriapi.Page{
+					AuthorPublicKey: authorPubKey,
+					Ciphertext:      util.RandBytes(st.rng, 128),
+					CiphertextMac:   util.RandBytes(st.rng, 32),
+				},
+				MetadataCiphertext:    util.RandBytes(st.rng, 128),
+				MetadataCiphertextMac: util.RandBytes(st.rng, 32),
+			},
+		},
+	}
+	entryDocKey, err := libriapi.GetKey(entryDoc)
+	errors.MaybePanic(err)
+	ctx, cancel := params.getCtx()
+	defer cancel()
+	_, err = st.courierClient.Put(ctx, &courierapi.PutRequest{
+		Key:   entryDocKey.Bytes(),
+		Value: entryDoc,
+	})
+	return entryDocKey.Bytes(), err
+}
+
+func shareEnv(st *state, params *parameters, entryKey, authorPubKey, readerPubKey []byte) error {
+	env := &libriapi.Envelope{
+		EntryKey:         entryKey,
+		AuthorPublicKey:  authorPubKey,
+		ReaderPublicKey:  readerPubKey,
+		EekCiphertext:    util.RandBytes(st.rng, libriapi.EEKCiphertextLength),
+		EekCiphertextMac: util.RandBytes(st.rng, libriapi.HMAC256Length),
+	}
+	envDoc := &libriapi.Document{
+		Contents: &libriapi.Document_Envelope{
+			Envelope: env,
+		},
+	}
+	envDocKey, err := libriapi.GetKey(envDoc)
+	errors.MaybePanic(err)
+	ctx, cancel := params.getCtx()
+	defer cancel()
+	_, err = st.courierClient.Put(ctx, &courierapi.PutRequest{
+		Key:   envDocKey.Bytes(),
+		Value: envDoc,
+	})
+	return err
+}
+
+func getRandEntityID(st *state, params *parameters) string {
+	userIdx := st.rng.Intn(params.nUsers)
+	entityIdx := st.rng.Intn(params.nUserEntities)
+	return st.userEntityIDs[userIdx][entityIdx]
+}
+
+func getRandPubKey(st *state, params *parameters, entityID string, kt keyapi.KeyType) []byte {
+	pubKeyIdx := st.rng.Intn(params.nEntityKeys)
+	if kt == keyapi.KeyType_AUTHOR {
+		return st.entityAuthorPubKeys[entityID][pubKeyIdx]
+	}
+	return st.entityReaderPubKeys[entityID][pubKeyIdx]
 }
 
 func getUserID(userIdx int) string {
@@ -288,12 +379,15 @@ func newCourierConfig(st *state, params *parameters) (*cserver.Config, *net.TCPA
 		WithCatalogAddr(st.catalogAddr).
 		WithKeyAddr(st.keyAddr).
 		WithCache(cacheParams).
-		WithGCPProjectID(params.gcpProjectID).
-		WithNLibriPutters(0).
-		WithNCatalogPutters(0)
+		WithGCPProjectID(params.gcpProjectID)
 	config.WithServerPort(uint(serverPort)).
 		WithMetricsPort(uint(serverPort + 1)).
 		WithLogLevel(params.courierLogLevel)
+
+	// since no Libri
+	config.NLibriPutters = 0
+	config.SubscribeTo.NSubscriptions = 0
+
 	addr := &net.TCPAddr{IP: net.ParseIP("localhost"), Port: serverPort}
 	return config, addr
 }
