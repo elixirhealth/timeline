@@ -240,6 +240,7 @@ func putEntry(st *state, params *parameters, authorPubKey []byte) ([]byte, error
 					Ciphertext:      util.RandBytes(st.rng, 128),
 					CiphertextMac:   util.RandBytes(st.rng, 32),
 				},
+				CreatedTime:           uint32(time.Now().Unix()),
 				MetadataCiphertext:    util.RandBytes(st.rng, 128),
 				MetadataCiphertextMac: util.RandBytes(st.rng, 32),
 			},
@@ -399,6 +400,7 @@ func newCourierConfig(st *state, params *parameters) (*cserver.Config, *net.TCPA
 	// since no Libri
 	config.NLibriPutters = 0
 	config.SubscribeTo.NSubscriptions = 0
+	config.LibriPutQueueSize = uint(params.nEntryDocs*(1+params.nMaxShares) + 1)
 
 	addr := &net.TCPAddr{IP: net.ParseIP("localhost"), Port: serverPort}
 	return config, addr
