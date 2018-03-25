@@ -168,7 +168,7 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 			_, in := st.userEntries[userID][entryKeyHex]
 			assert.True(t, in)
 		}
-		//assert.Equal(t, len(st.userEntries[userID]), len(timelineEntries))
+		assert.Equal(t, len(st.userEntries[userID]), len(rp.Events))
 	}
 }
 
