@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/elxirhealth/service-base/pkg/cmd"
 	"github.com/spf13/viper"
@@ -15,14 +16,24 @@ func TestGetTimelineConfig(t *testing.T) {
 	profilerPort := uint(9012)
 	logLevel := zapcore.DebugLevel.String()
 	profile := true
-	// TODO add other non-default config values
+	courier := "127.0.0.1:10100"
+	catalog := "127.0.0.1:10200"
+	directory := "127.0.0.1:10300"
+	user := "127.0.0.1:10400"
+	parallelism := uint(2)
+	timeout := 2 * time.Second
 
 	viper.Set(cmd.ServerPortFlag, serverPort)
 	viper.Set(cmd.MetricsPortFlag, metricsPort)
 	viper.Set(cmd.ProfilerPortFlag, profilerPort)
 	viper.Set(cmd.LogLevelFlag, logLevel)
 	viper.Set(cmd.ProfileFlag, profile)
-	// TODO set other non-default config value
+	viper.Set(courierFlag, courier)
+	viper.Set(catalogFlag, catalog)
+	viper.Set(directoryFlag, directory)
+	viper.Set(userFlag, user)
+	viper.Set(parallelismFlag, parallelism)
+	viper.Set(timeoutFlag, timeout)
 
 	c, err := getTimelineConfig()
 	assert.Nil(t, err)
@@ -31,6 +42,10 @@ func TestGetTimelineConfig(t *testing.T) {
 	assert.Equal(t, profilerPort, c.ProfilerPort)
 	assert.Equal(t, logLevel, c.LogLevel.String())
 	assert.Equal(t, profile, c.Profile)
-	// TODO assert equal other non-default config values
-
+	assert.Equal(t, courier, c.Courier.String())
+	assert.Equal(t, catalog, c.Catalog.String())
+	assert.Equal(t, directory, c.Directory.String())
+	assert.Equal(t, user, c.User.String())
+	assert.Equal(t, parallelism, c.Parallelism)
+	assert.Equal(t, timeout, c.RequestTimeout)
 }
