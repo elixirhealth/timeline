@@ -400,7 +400,7 @@ func tearDown(t *testing.T, st *state) {
 func startDatastoreEmulator(params *parameters, st *state) {
 	datastoreDataDir := path.Join(st.dataDir, "datastore")
 	cmd := exec.Command("gcloud", "beta", "emulators", "datastore", "start",
-		//"--no-store-on-disk",
+		"--no-store-on-disk",
 		"--host-port", params.datastoreAddr,
 		"--project", params.gcpProjectID,
 		"--data-dir", datastoreDataDir,
@@ -451,11 +451,13 @@ func newTimelineConfigs(st *state, params *parameters) ([]*server.Config, []*net
 			WithCourierAddr(st.courierAddr).
 			WithCatalogAddr(st.catalogAddr).
 			WithDirectoryAddr(st.directoryAddr).
-			WithUserAddr(st.userAddr).
-			WithParallelism(2)
+			WithUserAddr(st.userAddr)
 		configs[i].WithServerPort(uint(serverPort)).
 			WithMetricsPort(uint(metricsPort)).
 			WithLogLevel(params.timelineLogLevel)
+
+		// seems that DataStore emulator doesn't handle parallel searches well
+		configs[i].Parallelism = 1
 		addrs[i] = &net.TCPAddr{IP: net.ParseIP("localhost"), Port: serverPort}
 	}
 	return configs, addrs
