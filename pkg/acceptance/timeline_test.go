@@ -160,7 +160,10 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 		}
 		assert.True(t, len(rp.Events) > 0)
 
-		for _, ev := range rp.Events {
+		for i, ev := range rp.Events {
+			if i > 0 {
+				assert.True(t, rp.Events[i].Time <= rp.Events[i-1].Time)
+			}
 			entryKeyHex := hex.EncodeToString(ev.Envelope.EntryKey)
 			_, in := st.userEntries[userID][entryKeyHex]
 			assert.True(t, in)
