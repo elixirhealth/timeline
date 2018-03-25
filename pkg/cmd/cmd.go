@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"log"
+	"net"
 
-	"github.com/drausin/libri/libri/common/errors"
+	cerrors "github.com/drausin/libri/libri/common/errors"
 	"github.com/drausin/libri/libri/common/logging"
 	"github.com/elxirhealth/service-base/pkg/cmd"
 	bserver "github.com/elxirhealth/service-base/pkg/server"
@@ -19,18 +21,23 @@ const (
 	serviceNameCamel = "Timeline"
 	envVarPrefix     = "TIMELINE"
 	logLevelFlag     = "logLevel"
-
-	// TODO uncomment or delete
-	//storageMemoryFlag    = "storageMemory"
-	//storageDataStoreFlag = "storageDataStore"
-	//storagePostgresFlag  = "storagePostgres"
-	//dbURLFlag            = "dbURL"
+	courierFlag      = "courier"
+	catalogFlag      = "catalog"
+	directoryFlag    = "directory"
+	userFlag         = "user"
+	timeoutFlag      = "timeout"
+	parallelismFlag  = "parallelism"
 )
 
 var (
 	rootCmd = &cobra.Command{
-		Short: "TODO", // TODO
+		Short: "operate a timeline server",
 	}
+
+	errMissingCatalog   = errors.New("missing catalog address")
+	errMissingCourier   = errors.New("missing courier address")
+	errMissingDirectory = errors.New("missing directory address")
+	errMissingUser      = errors.New("missing user address")
 )
 
 func init() {
@@ -39,25 +46,24 @@ func init() {
 
 	cmd.Start(serviceNameLower, serviceNameCamel, rootCmd, version.Current, start,
 		func(flags *pflag.FlagSet) {
-			// TODO define other flags here if needed, e.g.,
-			//flags.Bool(storageMemoryFlag, true, "use in-memory storage")
-			//flags.Bool(storageDataStoreFlag, false, "use GCP DataStore storage")
-			//flags.Bool(storagePostgresFlag, false, "use Postgres DB storage")
-			//flags.String(dbURLFlag, "", "Postgres DB URL")
+			flags.String(courierFlag, "", "courier service address")
+			flags.String(catalogFlag, "", "catalog service address")
+			flags.String(directoryFlag, "", "directory service address")
+			flags.String(userFlag, "", "user service address")
+			flags.Duration(timeoutFlag, server.DefaultRequestTimeout,
+				"timeout for dependency service requests")
+			flags.Uint(parallelismFlag, server.DefaultParallelism,
+				"parallelism for dependency service requests")
 		})
 
 	testCmd := cmd.Test(serviceNameLower, rootCmd)
 	cmd.TestHealth(serviceNameLower, testCmd)
-	cmd.TestIO(serviceNameLower, testCmd, testIO, func(flags *pflag.FlagSet) {
-		// TODO define other flags here if needed
-	})
-
 	cmd.Version(serviceNameLower, rootCmd, version.Current)
 
 	// bind viper flags
 	viper.SetEnvPrefix(envVarPrefix) // look for env vars with prefix
 	viper.AutomaticEnv()             // read in environment variables that match
-	errors.MaybePanic(viper.BindPFlags(rootCmd.Flags()))
+	cerrors.MaybePanic(viper.BindPFlags(rootCmd.Flags()))
 }
 
 // Execute runs the root timeline command.
@@ -76,13 +82,43 @@ func start() error {
 }
 
 func getTimelineConfig() (*server.Config, error) {
+	courierAddr, err := getAddr(courierFlag, errMissingCourier)
+	if err != nil {
+		return nil, err
+	}
+	catalogAddr, err := getAddr(catalogFlag, errMissingCatalog)
+	if err != nil {
+		return nil, err
+	}
+	directoryAddr, err := getAddr(directoryFlag, errMissingDirectory)
+	if err != nil {
+		return nil, err
+	}
+	userAddr, err := getAddr(userFlag, errMissingUser)
+	if err != nil {
+		return nil, err
+	}
+
 	c := server.NewDefaultConfig()
 	c.WithServerPort(uint(viper.GetInt(cmd.ServerPortFlag))).
 		WithMetricsPort(uint(viper.GetInt(cmd.MetricsPortFlag))).
 		WithProfilerPort(uint(viper.GetInt(cmd.ProfilerPortFlag))).
 		WithLogLevel(logging.GetLogLevel(viper.GetString(logLevelFlag))).
 		WithProfile(viper.GetBool(cmd.ProfileFlag))
-	// TODO set other config elements here
+	c.WithCourierAddr(courierAddr).
+		WithCatalogAddr(catalogAddr).
+		WithDirectoryAddr(directoryAddr).
+		WithUserAddr(userAddr).
+		WithParallelism(uint(viper.GetInt(parallelismFlag))).
+		WithRequestTimeout(viper.GetDuration(timeoutFlag))
 
 	return c, nil
+}
+
+func getAddr(addrFlag string, missingErr error) (*net.TCPAddr, error) {
+	strAddr := viper.GetString(addrFlag)
+	if strAddr == "" {
+		return nil, missingErr
+	}
+	return net.ResolveTCPAddr("tcp4", strAddr)
 }
