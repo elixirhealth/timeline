@@ -147,13 +147,12 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 		userID := getUserID(i)
 		tlClient := st.timelineClients[st.rng.Intn(len(st.timelineClients))]
 
-		//ctx, cancel := params.getCtx()
-		ctx := context.Background()
+		ctx, cancel := params.getCtx()
 		rp, err := tlClient.Get(ctx, &api.GetRequest{
 			UserId:    getUserID(i),
 			TimeRange: &api.TimeRange{},
 		})
-		//cancel()
+		cancel()
 		assert.Nil(t, err)
 		if rp == nil {
 			// avoid nil pointer panics below
@@ -161,10 +160,8 @@ func testGetTimeline(t *testing.T, params *parameters, st *state) {
 		}
 		assert.True(t, len(rp.Events) > 0)
 
-		//timelineEntries := make(map[string]struct{})
 		for _, ev := range rp.Events {
 			entryKeyHex := hex.EncodeToString(ev.Envelope.EntryKey)
-			//timelineEntries[] = struct{}{}
 			_, in := st.userEntries[userID][entryKeyHex]
 			assert.True(t, in)
 		}
