@@ -9,11 +9,11 @@ import (
 	"time"
 
 	libriapi "github.com/drausin/libri/libri/librarian/api"
-	catapi "github.com/elxirhealth/catalog/pkg/catalogapi"
-	dirapi "github.com/elxirhealth/directory/pkg/directoryapi"
-	bserver "github.com/elxirhealth/service-base/pkg/server"
-	"github.com/elxirhealth/service-base/pkg/util"
-	api "github.com/elxirhealth/timeline/pkg/timelineapi"
+	catapi "github.com/elixirhealth/catalog/pkg/catalogapi"
+	dirapi "github.com/elixirhealth/directory/pkg/directoryapi"
+	bserver "github.com/elixirhealth/service-base/pkg/server"
+	"github.com/elixirhealth/service-base/pkg/util"
+	api "github.com/elixirhealth/timeline/pkg/timelineapi"
 	"github.com/stretchr/testify/assert"
 )
 

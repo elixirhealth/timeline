@@ -1,7 +1,7 @@
 package server
 
 import (
-	catapi "github.com/elxirhealth/catalog/pkg/catalogapi"
+	catapi "github.com/elixirhealth/catalog/pkg/catalogapi"
 )
 
 // publicationReceipts is a min-heap of PublicationReceipt objects sorted ascending by ReceivedTime

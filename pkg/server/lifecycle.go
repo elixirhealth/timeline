@@ -1,7 +1,7 @@
 package server
 
 import (
-	api "github.com/elxirhealth/timeline/pkg/timelineapi"
+	api "github.com/elixirhealth/timeline/pkg/timelineapi"
 	"google.golang.org/grpc"
 )
 

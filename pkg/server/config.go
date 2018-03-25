@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/drausin/libri/libri/common/errors"
-	"github.com/elxirhealth/service-base/pkg/server"
+	"github.com/elixirhealth/service-base/pkg/server"
 	"go.uber.org/zap/zapcore"
 )
 
