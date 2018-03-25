@@ -126,8 +126,8 @@ func TestAcceptance(t *testing.T) {
 		rqTimeout:         10 * time.Second, // very large b/c there are lots of services
 		datastoreAddr:     "localhost:2001",
 		gcpProjectID:      "dummy-acceptance-id",
-		timelineLogLevel:  zapcore.DebugLevel,
-		catalogLogLevel:   zapcore.DebugLevel,
+		timelineLogLevel:  zapcore.InfoLevel,
+		catalogLogLevel:   zapcore.InfoLevel,
 		courierLogLevel:   zapcore.InfoLevel,
 		directoryLogLevel: zapcore.InfoLevel,
 		keyLogLevel:       zapcore.InfoLevel,
