@@ -400,7 +400,7 @@ func tearDown(t *testing.T, st *state) {
 func startDatastoreEmulator(params *parameters, st *state) {
 	datastoreDataDir := path.Join(st.dataDir, "datastore")
 	cmd := exec.Command("gcloud", "beta", "emulators", "datastore", "start",
-		"--no-store-on-disk",
+		//"--no-store-on-disk",
 		"--host-port", params.datastoreAddr,
 		"--project", params.gcpProjectID,
 		"--data-dir", datastoreDataDir,
