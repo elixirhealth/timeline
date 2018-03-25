@@ -31,6 +31,9 @@ docker-image:
 	@echo "--> Building docker image"
 	@docker build --rm=false -t gcr.io/elxir-core-infra/timeline:snapshot deploy
 
+enter-build-container:
+	@vendor/$(SERVICE_BASE_PKG)/scripts/run-build-container.sh
+
 fix:
 	@echo "--> Running goimports"
 	@find . -name *.go | grep -v /vendor/ | xargs goimports -l -w

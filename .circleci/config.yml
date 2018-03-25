@@ -10,17 +10,34 @@ jobs:
     working_directory: /go/src/github.com/elxirhealth/timeline
     steps:
       - checkout
+      - setup_remote_docker
       - restore_cache:
           keys:
-            - arch={{ arch }}-vendor={{ checksum "Gopkg.lock" }}-v1
-            - arch={{ arch }}-vendor={{ checksum "Gopkg.lock" }}
+            - arch={{ arch }}-rocksdb=5.8-vendor={{ checksum "Gopkg.lock" }}-v1
+            - arch={{ arch }}-rocksdb=5.8-vendor={{ checksum "Gopkg.lock" }}
+            - arch={{ arch }}-rocksdb=5.8
             - arch={{ arch }}
       - run: make get-deps
+      - run:
+          name: install RocksDB
+          command: |
+            # hack to make sure RocksDB runs on CircleCI machines
+            test -e /usr/local/lib/librocksdb.a && md5sum /usr/local/lib/librocksdb.a
+            if [[ $(md5sum /usr/local/lib/librocksdb.a | awk '{print $1}') != "a73f8632b79a959408f82f60b146f8a6" ]]; then
+              ./build/install-rocksdb.sh
+            fi
+      - run:
+          name: install gorocksdb
+          command: ./build/install-gorocksdb.sh
       - save_cache:
-          key: arch={{ arch }}-vendor={{ checksum "Gopkg.lock" }}-v1
+          key: arch={{ arch }}-rocksdb=5.8-vendor={{ checksum "Gopkg.lock" }}-v1
           paths:
             - vendor
+            - /usr/local/include/rocksdb
+            - /usr/local/lib/librocksdb.a
       - run: make build
+      - run: make build-static
+      - run: make docker-image
       - run: make test
-      - run: make acceptance
       - run: make lint
+      - run: make acceptance

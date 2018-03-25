@@ -11,6 +11,7 @@ import (
 	libriapi "github.com/drausin/libri/libri/librarian/api"
 	catapi "github.com/elxirhealth/catalog/pkg/catalogapi"
 	dirapi "github.com/elxirhealth/directory/pkg/directoryapi"
+	bserver "github.com/elxirhealth/service-base/pkg/server"
 	"github.com/elxirhealth/service-base/pkg/util"
 	api "github.com/elxirhealth/timeline/pkg/timelineapi"
 	"github.com/stretchr/testify/assert"
@@ -116,6 +117,7 @@ func TestTimeline_Get_ok(t *testing.T) {
 	}
 
 	tl := &Timeline{
+		BaseServer: bserver.NewBaseServer(bserver.NewDefaultBaseConfig()),
 		entityIDGetter: &fixedEntityIDGetter{
 			entityIDs: []string{entity1.EntityId, entity2.EntityId},
 		},
@@ -166,8 +168,12 @@ func TestTimeline_Get_ok(t *testing.T) {
 	rp, err := tl.Get(context.Background(), rq)
 	assert.Nil(t, err)
 	assert.Equal(t, len(prs), len(rp.Events))
-	for _, event := range rp.Events {
+	for i, event := range rp.Events {
 		assert.NotEmpty(t, event.Time)
+		if i > 0 {
+			// check descending time event ordering
+			assert.True(t, event.Time < rp.Events[i-1].Time)
+		}
 		assert.NotEmpty(t, event.Envelope)
 		assert.NotEmpty(t, event.EntryMetadata)
 		assert.NotEmpty(t, event.Reader)
@@ -183,18 +189,22 @@ func TestTimeline_Get_err(t *testing.T) {
 			UpperBound: nowMicros,
 		},
 	}
+	baseServer := bserver.NewBaseServer(bserver.NewDefaultBaseConfig())
 	cases := map[string]struct {
 		tl       *Timeline
 		rq       *api.GetRequest
 		expected error
 	}{
 		"invalid rq": {
-			tl:       &Timeline{},
+			tl: &Timeline{
+				BaseServer: baseServer,
+			},
 			rq:       &api.GetRequest{},
 			expected: api.ErrEmptyUserID,
 		},
 		"entityIDGetter err": {
 			tl: &Timeline{
+				BaseServer:     baseServer,
 				entityIDGetter: &fixedEntityIDGetter{err: errTest},
 			},
 			rq:       okRq,
@@ -202,6 +212,7 @@ func TestTimeline_Get_err(t *testing.T) {
 		},
 		"pubReceiptGetter err": {
 			tl: &Timeline{
+				BaseServer:       baseServer,
 				entityIDGetter:   &fixedEntityIDGetter{},
 				pubReceiptGetter: &fixedPubReceiptGetter{err: errTest},
 			},
@@ -210,6 +221,7 @@ func TestTimeline_Get_err(t *testing.T) {
 		},
 		"envelopeGetter err": {
 			tl: &Timeline{
+				BaseServer:       baseServer,
 				entityIDGetter:   &fixedEntityIDGetter{},
 				pubReceiptGetter: &fixedPubReceiptGetter{},
 				envelopeGetter:   &fixedEnvelopeGetter{err: errTest},
@@ -219,6 +231,7 @@ func TestTimeline_Get_err(t *testing.T) {
 		},
 		"entryMetadataGetter err": {
 			tl: &Timeline{
+				BaseServer:          baseServer,
 				entityIDGetter:      &fixedEntityIDGetter{},
 				pubReceiptGetter:    &fixedPubReceiptGetter{},
 				envelopeGetter:      &fixedEnvelopeGetter{},
@@ -229,6 +242,7 @@ func TestTimeline_Get_err(t *testing.T) {
 		},
 		"entitySummaryGetter err": {
 			tl: &Timeline{
+				BaseServer:          baseServer,
 				entityIDGetter:      &fixedEntityIDGetter{},
 				pubReceiptGetter:    &fixedPubReceiptGetter{},
 				envelopeGetter:      &fixedEnvelopeGetter{},

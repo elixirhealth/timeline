@@ -29,8 +29,8 @@ type entityIDGetterImpl struct {
 func (g *entityIDGetterImpl) get(userID string) ([]string, error) {
 	rq := &userapi.GetEntitiesRequest{UserId: userID}
 	ctx, cancel := context.WithTimeout(context.Background(), g.rqTimeout)
-	defer cancel()
 	rp, err := g.user.GetEntities(ctx, rq)
+	cancel()
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +105,6 @@ func (g *pubReceiptGetterImpl) getWorker(
 			Before:         tr.UpperBound,
 			Limit:          limit,
 		}
-
 		ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
 		rp, err := g.catalog.Search(ctx, rq)
 		cancel()
