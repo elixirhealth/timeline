@@ -3,7 +3,7 @@ package server
 import (
 	"encoding/hex"
 
-	api "github.com/elxirhealth/catalog/pkg/catalogapi"
+	api "github.com/elixirhealth/catalog/pkg/catalogapi"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

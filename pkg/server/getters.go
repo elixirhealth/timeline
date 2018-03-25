@@ -7,11 +7,11 @@ import (
 	"time"
 
 	libriapi "github.com/drausin/libri/libri/librarian/api"
-	catapi "github.com/elxirhealth/catalog/pkg/catalogapi"
-	"github.com/elxirhealth/courier/pkg/courierapi"
-	"github.com/elxirhealth/directory/pkg/directoryapi"
-	api "github.com/elxirhealth/timeline/pkg/timelineapi"
-	"github.com/elxirhealth/user/pkg/userapi"
+	catapi "github.com/elixirhealth/catalog/pkg/catalogapi"
+	"github.com/elixirhealth/courier/pkg/courierapi"
+	"github.com/elixirhealth/directory/pkg/directoryapi"
+	api "github.com/elixirhealth/timeline/pkg/timelineapi"
+	"github.com/elixirhealth/user/pkg/userapi"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )

@@ -3,12 +3,12 @@ package server
 import (
 	"encoding/hex"
 
-	catclient "github.com/elxirhealth/catalog/pkg/client"
-	courclient "github.com/elxirhealth/courier/pkg/client"
-	dirclient "github.com/elxirhealth/directory/pkg/client"
-	"github.com/elxirhealth/service-base/pkg/server"
-	api "github.com/elxirhealth/timeline/pkg/timelineapi"
-	userclient "github.com/elxirhealth/user/pkg/client"
+	catclient "github.com/elixirhealth/catalog/pkg/client"
+	courclient "github.com/elixirhealth/courier/pkg/client"
+	dirclient "github.com/elixirhealth/directory/pkg/client"
+	"github.com/elixirhealth/service-base/pkg/server"
+	api "github.com/elixirhealth/timeline/pkg/timelineapi"
+	userclient "github.com/elixirhealth/user/pkg/client"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"

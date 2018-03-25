@@ -1,6 +1,6 @@
 package main
 
-import "github.com/elxirhealth/timeline/pkg/cmd"
+import "github.com/elixirhealth/timeline/pkg/cmd"
 
 func main() {
 	cmd.Execute()

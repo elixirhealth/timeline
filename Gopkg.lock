@@ -83,29 +83,29 @@
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/catalog"
+  name = "github.com/elixirhealth/catalog"
   packages = [
     "pkg/catalogapi",
     "pkg/client",
     "pkg/server",
     "pkg/server/storage"
   ]
-  revision = "91a09b55f540b87ea1720bc483a9a4ca993f4d87"
+  revision = "28aa5cc0dde0f4a09503ec706ad318e3b2627c98"
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/courier"
+  name = "github.com/elixirhealth/courier"
   packages = [
     "pkg/cache",
     "pkg/client",
     "pkg/courierapi",
     "pkg/server"
   ]
-  revision = "01f2c3641b5e81147e08d1da22ddf7d4c58b86e6"
+  revision = "0d2233b8934910cdc3f86c9fec3519b25d7288d9"
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/directory"
+  name = "github.com/elixirhealth/directory"
   packages = [
     "pkg/client",
     "pkg/directoryapi",
@@ -116,22 +116,22 @@
     "pkg/server/storage/postgres",
     "pkg/server/storage/postgres/migrations"
   ]
-  revision = "907f0d22375b1d8cbab55575e1d6134081922fe7"
+  revision = "6c2502f3a1bcbd1be35253e33043086b463b0a88"
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/key"
+  name = "github.com/elixirhealth/key"
   packages = [
     "pkg/client",
     "pkg/keyapi",
     "pkg/server",
     "pkg/server/storage"
   ]
-  revision = "935bc194cda0da986d5ca2d22be6cf38210de38b"
+  revision = "787ce4d36cbebc372522fb99dd41aa3b877242d3"
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/service-base"
+  name = "github.com/elixirhealth/service-base"
   packages = [
     "pkg/cmd",
     "pkg/server",
@@ -139,18 +139,18 @@
     "pkg/util",
     "pkg/version"
   ]
-  revision = "4db3ff36815e2ea5caccc03f35bb6dfe5dea9fcb"
+  revision = "0ac1d7440a84122b037e7bcc89aec0fd608c85f1"
 
 [[projects]]
   branch = "develop"
-  name = "github.com/elxirhealth/user"
+  name = "github.com/elixirhealth/user"
   packages = [
     "pkg/client",
     "pkg/server",
     "pkg/server/storage",
     "pkg/userapi"
   ]
-  revision = "86f8851185770a941528e9ae40542725d6f97351"
+  revision = "16debd99842052f983f196fda4cc68a0be96f8b0"
 
 [[projects]]
   name = "github.com/ethereum/go-ethereum"
@@ -590,6 +590,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "667bc7a90a0cff971aa8468e880be83ccff7e575cd542f2e746a003351542498"
+  inputs-digest = "986c74c9806fab0d0b9533a1a1c04291afdefdf581be9e9e042cd0054d278261"
   solver-name = "gps-cdcl"
   solver-version = 1

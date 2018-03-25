@@ -7,7 +7,7 @@ jobs:
           username: _json_key
           password: ${GCR_SVC_JSON}
     parallelism: 1
-    working_directory: /go/src/github.com/elxirhealth/timeline
+    working_directory: /go/src/github.com/elixirhealth/timeline
     steps:
       - checkout
       - setup_remote_docker
