@@ -3,6 +3,7 @@ package server
 import (
 	"container/heap"
 	"encoding/hex"
+	"log"
 	"sync"
 	"time"
 
@@ -105,6 +106,7 @@ func (g *pubReceiptGetterImpl) getWorker(
 			Before:         tr.UpperBound,
 			Limit:          limit,
 		}
+		log.Printf("search request: %v\n", rq)
 
 		ctx, cancel := context.WithTimeout(bgCtx(), g.rqTimeout)
 		rp, err := g.catalog.Search(ctx, rq)
