@@ -452,7 +452,7 @@ func newTimelineConfigs(st *state, params *parameters) ([]*server.Config, []*net
 			WithCatalogAddr(st.catalogAddr).
 			WithDirectoryAddr(st.directoryAddr).
 			WithUserAddr(st.userAddr).
-			WithParallelism(1)
+			WithParallelism(2)
 		configs[i].WithServerPort(uint(serverPort)).
 			WithMetricsPort(uint(metricsPort)).
 			WithLogLevel(params.timelineLogLevel)
